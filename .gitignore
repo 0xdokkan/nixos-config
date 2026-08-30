@@ -1,0 +1,9 @@
+# output di build nix (symlink "result" e derivati)
+result
+result-*
+# immagine disco creata da nixos-rebuild build-vm
+*.qcow2
+# direnv
+.direnv/
+# database per-progetto (pattern devshell postgres)
+.pgdata/

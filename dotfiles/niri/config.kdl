@@ -1,0 +1,970 @@
+// ╔══════════════════════════════════════════════════════════════════════╗
+// ║  niri config — migrato da Hyprland (HyDE)                            ║
+// ║  data: 2026-05-10                                                    ║
+// ║  modello workspace: dinamico scrollable (paradigma niri full)        ║
+// ║                                                                      ║
+// ║  Note importanti:                                                    ║
+// ║   - In niri i workspace sono VERTICALI e dinamici. I bind Super+1..0 ║
+// ║     usano `focus-workspace N` che crea/raggiunge il workspace N.     ║
+// ║   - Le finestre nel workspace si organizzano in COLONNE che          ║
+// ║     scrollano orizzontalmente. Dentro una colonna ci possono essere  ║
+// ║     più finestre impilate verticalmente.                             ║
+// ║   - I gesti touchpad sono integrati: 3-dita orizzontale = scroll     ║
+// ║     colonne, 3-dita verticale = cambio workspace.                    ║
+// ║   - niri ricarica la config automaticamente quando il file cambia.   ║
+// ╚══════════════════════════════════════════════════════════════════════╝
+
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// INPUT — tastiera, touchpad, mouse
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+input {
+    keyboard {
+        xkb {
+            // Aggiungi altre layout qui se vuoi che keyboardswitch.sh
+            // possa ciclare tra più. Esempio: layout "us,it"
+            layout "us"
+        }
+        // Equivalente di numlock_by_default = true
+        numlock
+        repeat-delay 600
+        repeat-rate 25
+    }
+
+    touchpad {
+        // tap-to-click
+        tap
+        // dwt (disable while typing) — equivalente al comportamento HyDE
+        dwt
+        // hyprland aveva natural_scroll = no
+        // (niri di default usa natural-scroll, lo lasciamo OFF per parità)
+        // natural-scroll
+        accel-speed 0.0
+        accel-profile "adaptive"
+        // tap-button-map "left-right-middle"
+    }
+
+    mouse {
+        // hyprland aveva force_no_accel = 1
+        accel-profile "flat"
+        accel-speed 0.0
+    }
+
+    // hyprland: follow_mouse = 1
+    // In niri il focus-on-hover è opt-in:
+    // focus-follows-mouse max-scroll-amount="0%"
+
+    // Niente warp del mouse al cambio workspace
+    workspace-auto-back-and-forth
+
+    // touchpad gestures: niri ha già swipe a 3 dita built-in.
+    // Niente da configurare per imitare workspace_swipe di hyprland.
+
+    // Mouse drag-to-move/resize finestre tile è limitato in niri:
+    // funziona solo su finestre floating con Mod+left-click-drag e
+    // Mod+right-click-drag (configurato nei `binds` sotto).
+}
+
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// OUTPUT — singolo monitor, auto-detect
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+// Niri rileva il monitor automaticamente. Sblocca ed edita questo blocco
+// solo se vuoi forzare risoluzione/refresh/scale specifici. Per scoprire
+// il nome del tuo output, lancia: niri msg outputs
+//
+// output "eDP-1" {
+//     mode "1920x1080@60.000"
+//     scale 1.0
+//     position x=0 y=0
+//     variable-refresh-rate on-demand=true
+// }
+
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// LAYOUT — gap, larghezze colonna, focus ring, border
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+layout {
+    gaps 8
+    background-color "transparent"
+    center-focused-column "never"
+
+    // Larghezze preimpostate cicliche (premi il bind switch-preset-column-width)
+    preset-column-widths {
+        proportion 0.33333
+        proportion 0.5
+        proportion 0.66667
+        proportion 1.0
+    }
+
+    // Larghezza di default quando si apre una nuova colonna
+    default-column-width { proportion 0.5; }
+
+    // Focus ring (l'evidenziatore della finestra attiva)
+    focus-ring {
+        width 2
+        active-color "#7fc8ff"
+        inactive-color "#505050"
+    }
+
+    // Border vero e proprio (off di default, il focus-ring basta)
+    border {
+        off
+    }
+
+    // Indicatore di posizione di inserimento quando muovi colonne
+    insert-hint {
+        color "#ffc87f80"
+    }
+
+    struts {
+        // se waybar copre qualcosa, regola qui
+        // left 64
+        // right 64
+    }
+
+    // Empty workspaces sopra il primo (utile in modalità dinamica)
+    // empty-workspace-above-first
+}
+
+// hyprland: disable_hyprland_logo + disable_splash_rendering
+// In niri non c'è logo splash, niente da fare.
+
+// Preferisci finestre senza decorazioni client-side
+prefer-no-csd
+
+// Path screenshot (sostituisce screenshot.sh per il bind nativo)
+screenshot-path "~/Pictures/Screenshots/screenshot from %Y-%m-%d %H-%M-%S.png"
+
+// Cursor: hyprland aveva no_hardware_cursors per nvidia
+cursor {
+    hide-when-typing
+    hide-after-inactive-ms 2000
+}
+
+// Hot corners disattivati per evitare attivazioni accidentali dell'overview
+hotkey-overlay {
+    skip-at-startup
+}
+
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// SPAWN AT STARTUP — equivalente di exec-once di hyprland
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+// === Tenuti perché servono a DMS / al Wayland session ===
+// Restart xdg-desktop-portal per screensharing — sostituisce resetxdgportal.sh
+spawn-at-startup "sh" "-c" "systemctl --user restart xdg-desktop-portal xdg-desktop-portal-gtk"
+spawn-at-startup "sh" "-c" "dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP"
+spawn-at-startup "sh" "-c" "dbus-update-activation-environment --systemd --all"
+spawn-at-startup "sh" "-c" "systemctl --user import-environment WAYLAND_DISPLAY XDG_CURRENT_DESKTOP"
+// udiskie: gestione media rimovibili (DMS non lo include)
+spawn-at-startup "udiskie" "--no-automount" "--smart-tray"
+// cliphist: DMS lo usa sotto, ma il watch va comunque avviato
+spawn-at-startup "sh" "-c" "wl-paste --type text --watch cliphist store"
+spawn-at-startup "sh" "-c" "wl-paste --type image --watch cliphist store"
+// wl-gammarelay: ancora usato per i bind Alt+F8/F9 (warm/cool 3000K)
+spawn-at-startup "wl-gammarelay"
+
+// === Rimossi perché DMS li sostituisce ===
+//   waybar              → DMS bar
+//   dunst               → DMS notifications
+//   blueman-applet      → DMS control-center (bluetooth)
+//   nm-applet           → DMS control-center (network)
+//   polkitkdeauth.sh    → DMS polkit agent
+//   batterynotify.sh    → DMS battery notifications
+//   awww-daemon + restore → DMS wallpaper engine
+//
+// === DMS NON va in spawn-at-startup ===
+// Lo lanciamo via systemd: `systemctl --user add-wants niri.service dms`
+// così parte SOLO quando niri parte. Vedi MIGRATION_NOTES.
+
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ENVIRONMENT — variabili equivalenti agli `env =` di hyprland.conf
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// NB: niri non espande variabili shell qui. Per il PATH aggiungi
+// ~/.local/share/bin nel tuo .zshrc/.bashrc o ~/.profile, NON qui:
+// settarlo wholesale qui sovrascriverebbe il resto del PATH.
+
+environment {
+    XDG_CURRENT_DESKTOP "niri"
+    XDG_SESSION_TYPE "wayland"
+    XDG_SESSION_DESKTOP "niri"
+    QT_QPA_PLATFORM "wayland;xcb"
+    QT_QPA_PLATFORMTHEME "qt6ct"
+    QT_WAYLAND_DISABLE_WINDOWDECORATION "1"
+    QT_AUTO_SCREEN_SCALE_FACTOR "1"
+    MOZ_ENABLE_WAYLAND "1"
+    GDK_SCALE "1"
+    // (rimosse le env var nvidia: GBM_BACKEND, __GLX_VENDOR_LIBRARY_NAME,
+    //  LIBVA_DRIVER_NAME, __GL_VRR_ALLOWED, NIRI_DISABLE_HARDWARE_CURSORS —
+    //  il T470s è Intel HD 620, su iGPU non servono e alcune farebbero danni)
+}
+
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ANIMAZIONI — adattamento delle bezier "wind/winIn/winOut" di HyDE
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+animations {
+    // Globale: 1.0 = velocità nominale. Aumenta per rallentare tutto.
+    slowdown 1.0
+
+    workspace-switch {
+        spring damping-ratio=1.0 stiffness=1000 epsilon=0.0001
+    }
+
+    horizontal-view-movement {
+        spring damping-ratio=1.0 stiffness=800 epsilon=0.0001
+    }
+
+    window-open {
+        duration-ms 200
+        curve "ease-out-expo"
+    }
+
+    window-close {
+        duration-ms 150
+        curve "ease-out-quad"
+    }
+
+    window-movement {
+        spring damping-ratio=1.0 stiffness=800 epsilon=0.0001
+    }
+
+    window-resize {
+        spring damping-ratio=1.0 stiffness=800 epsilon=0.0001
+    }
+
+    config-notification-open-close {
+        spring damping-ratio=0.6 stiffness=1000 epsilon=0.001
+    }
+
+    screenshot-ui-open {
+        duration-ms 200
+        curve "ease-out-quad"
+    }
+
+    overview-open-close {
+        spring damping-ratio=1.0 stiffness=800 epsilon=0.0001
+    }
+}
+
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// WINDOW RULES — porting di tutte le windowrule HyDE (62 regole)
+// Match: in niri si usano `app-id` (= class wayland) e `title` (regex).
+// Per app X11/xwayland l'app-id potrebbe differire — controlla con:
+//   niri msg --json windows
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+// --- Regola GLOBALE: blur + corner radius + fix tint focus-ring ---
+// 1) Blur globale: grazie a xray niri lo calcola una volta sul wallpaper.
+// 2) draw-border-with-background false: fix per la sfumatura azzurra che
+//    tracima attraverso le finestre semitrasparenti (Steam, Discord, ecc.).
+//    Senza questo, il colore del focus-ring si vede dietro al contenuto
+//    trasparente e tinge la finestra di azzurro quando ha il focus.
+window-rule {
+    geometry-corner-radius 8
+    clip-to-geometry true
+    draw-border-with-background false
+    background-effect {
+        blur true
+    }
+}
+
+// --- Browser e editor ---
+window-rule {
+    match app-id="firefox"
+    opacity 0.90
+    background-effect { blur true; }
+}
+window-rule {
+    match app-id="^[Bb]rave-browser$"
+    opacity 0.90
+    background-effect { blur true; }
+}
+window-rule {
+    match app-id="code-oss"
+    opacity 0.80
+    background-effect { blur true; }
+}
+window-rule {
+    match app-id="^[Cc]ode$"
+    opacity 0.80
+    background-effect { blur true; }
+}
+window-rule {
+    match app-id="code-url-handler"
+    opacity 0.80
+    background-effect { blur true; }
+}
+window-rule {
+    match app-id="code-insiders-url-handler"
+    opacity 0.80
+    background-effect { blur true; }
+}
+
+// --- Terminale & file manager ---
+window-rule {
+    match app-id="kitty"
+    opacity 0.80
+    background-effect { blur true; }
+}
+window-rule {
+    match app-id="org.kde.dolphin"
+    opacity 0.80
+    background-effect { blur true; }
+}
+
+// --- Tool che vogliamo floating ---
+window-rule {
+    match app-id="org.kde.ark"
+    opacity 0.80
+    open-floating true
+}
+window-rule {
+    match app-id="nwg-look"
+    opacity 0.80
+    open-floating true
+}
+window-rule {
+    match app-id="qt5ct"
+    opacity 0.80
+    open-floating true
+}
+window-rule {
+    match app-id="qt6ct"
+    opacity 0.80
+    open-floating true
+}
+window-rule {
+    match app-id="kvantummanager"
+    opacity 0.80
+    open-floating true
+}
+window-rule {
+    match app-id="org.pulseaudio.pavucontrol"
+    opacity 0.75
+    open-floating true
+}
+window-rule {
+    match app-id="blueman-manager"
+    opacity 0.75
+    open-floating true
+}
+window-rule {
+    match app-id="nm-applet"
+    opacity 0.75
+    open-floating true
+}
+window-rule {
+    match app-id="nm-connection-editor"
+    opacity 0.75
+    open-floating true
+}
+
+// --- Polkit & portali ---
+window-rule {
+    match app-id="org.kde.polkit-kde-authentication-agent-1"
+    opacity 0.75
+    open-floating true
+}
+window-rule {
+    match app-id="polkit-gnome-authentication-agent-1"
+    opacity 0.75
+}
+window-rule {
+    match app-id="org.freedesktop.impl.portal.desktop.gtk"
+    opacity 0.75
+}
+// (rimosso) match app-id="org.freedesktop.impl.portal.desktop.hyprland"
+// — non più rilevante, ora usiamo xdg-desktop-portal-gtk
+
+// --- Steam & Spotify ---
+window-rule {
+    match app-id="^[Ss]team$"
+    opacity 0.70
+}
+window-rule {
+    match app-id="steamwebhelper"
+    opacity 0.70
+}
+window-rule {
+    match app-id="^[Ss]potify$"
+    opacity 0.70
+}
+
+// --- App GTK varie ---
+window-rule {
+    match app-id="com.github.rafostar.Clapper"
+    opacity 0.90
+    open-floating true
+}
+window-rule {
+    match app-id="com.github.tchx84.Flatseal"
+    opacity 0.80
+}
+window-rule {
+    match app-id="hu.kramo.Cartridges"
+    opacity 0.80
+}
+window-rule {
+    match app-id="com.obsproject.Studio"
+    opacity 0.80
+}
+window-rule {
+    match app-id="gnome-boxes"
+    opacity 0.80
+}
+window-rule {
+    match app-id="vesktop"
+    opacity 0.80
+}
+window-rule {
+    match app-id="discord"
+    opacity 0.80
+}
+window-rule {
+    match app-id="WebCord"
+    opacity 0.80
+}
+window-rule {
+    match app-id="ArmCord"
+    opacity 0.80
+}
+window-rule {
+    match app-id="app.drey.Warp"
+    opacity 0.80
+    open-floating true
+}
+window-rule {
+    match app-id="net.davidotek.pupgui2"
+    opacity 0.80
+    open-floating true
+}
+window-rule {
+    match app-id="yad"
+    opacity 0.80
+    open-floating true
+}
+window-rule {
+    match app-id="Signal"
+    opacity 0.80
+    open-floating true
+}
+window-rule {
+    match app-id="io.github.alainm23.planify"
+    opacity 0.80
+    open-floating true
+}
+window-rule {
+    match app-id="io.gitlab.theevilskeleton.Upscaler"
+    opacity 0.80
+    open-floating true
+}
+window-rule {
+    match app-id="com.github.unrud.VideoDownloader"
+    opacity 0.80
+}
+window-rule {
+    match app-id="io.gitlab.adhami3310.Impression"
+    opacity 0.80
+    open-floating true
+}
+window-rule {
+    match app-id="io.missioncenter.MissionCenter"
+    opacity 0.80
+    open-floating true
+}
+window-rule {
+    match app-id="io.github.flattool.Warehouse"
+    opacity 0.80
+}
+
+// --- Floating per titolo (modali/dialoghi) ---
+window-rule {
+    match app-id="org.kde.dolphin" title="^Progress Dialog — Dolphin$"
+    open-floating true
+}
+window-rule {
+    match app-id="org.kde.dolphin" title="^Copying — Dolphin$"
+    open-floating true
+}
+window-rule {
+    match title="^About Mozilla Firefox$"
+    open-floating true
+}
+window-rule {
+    match app-id="firefox" title="^Picture-in-Picture$"
+    open-floating true
+}
+window-rule {
+    match app-id="firefox" title="^Library$"
+    open-floating true
+}
+window-rule {
+    match app-id="kitty" title="^top$"
+    open-floating true
+}
+window-rule {
+    match app-id="kitty" title="^btop$"
+    open-floating true
+}
+window-rule {
+    match app-id="kitty" title="^htop$"
+    open-floating true
+}
+window-rule {
+    match app-id="vlc"
+    open-floating true
+}
+window-rule {
+    match app-id="eog"
+    open-floating true
+}
+
+// --- Dialoghi modali comuni ---
+window-rule {
+    match title="^Open$"
+    open-floating true
+}
+window-rule {
+    match title="^Choose Files$"
+    open-floating true
+}
+window-rule {
+    match title="^Save As$"
+    open-floating true
+}
+window-rule {
+    match title="^Confirm to replace files$"
+    open-floating true
+}
+window-rule {
+    match title="^File Operation Progress$"
+    open-floating true
+}
+window-rule {
+    match app-id="xdg-desktop-portal-gtk"
+    open-floating true
+}
+
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// BLUR globale — applicato dove i background-effect lo richiedono
+// xray on di default = blur calcolato una volta sul wallpaper, riusato
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+// (eventuale blur globale da regolare se troppo intenso/leggero)
+// blur {
+//     passes 4
+//     radius 20
+// }
+
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// LAYER RULES — blur sui layer (rofi, dunst, swaync)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+// === DMS layer namespaces ===
+// Sul blur: NON serve mettere `background-effect { blur true; }` qui,
+// perché DMS usa ext-bg-effect-v1 protocol e chiede il blur al compositor
+// quando attivi "Background Blur" in Settings → Personalization → Theme.
+// Niri risponde nativamente al protocol. Le regole sotto sono per shadow
+// e privacy (screencast block-out).
+
+// Shadow sotto la bar e il dock
+layer-rule {
+    match namespace="^dms:bar$" 
+}
+
+layer-rule {
+    match namespace="^dms:dock$"
+    shadow {
+        on
+        softness 40
+        spread 5
+        offset x=0 y=5
+        draw-behind-window true
+        color "#00000064"
+    }
+}
+// Privacy: blocca le superfici sensibili dagli screencast
+// (se condividi schermo o registri, password e clipboard non finiscono nel video)
+layer-rule {
+    match namespace="^dms:clipboard$"
+    match namespace="^dms:polkit$"
+    match namespace="^dms:wifi-password$"
+    match namespace="^dms:bluetooth-pairing$"
+    block-out-from "screencast"
+    place-within-backdrop true
+
+}
+
+    
+// place-within-backdrop su modali/popout DMS — li mette dietro le finestre
+// in modalità overview di niri (Mod+S), per vedere meglio le finestre sotto
+layer-rule {
+    match namespace="^dms:notification-center-popout$"
+    match namespace="^dms:notification-center-modal$"
+    match namespace="^dms:control-center$"
+    place-within-backdrop true
+}
+
+// === Layer rule legacy (in caso rofi/dunst venissero comunque chiamati) ===
+// Le tengo come safety net: se uno script HyDE non patchato lancia rofi,
+// almeno il blur c'è. Non sono attive in flusso normale (DMS le sostituisce).
+layer-rule {
+    match namespace="^rofi$"
+    place-within-backdrop true
+    background-effect { blur true; }
+}
+layer-rule {
+    match namespace="^dunst$"
+    background-effect { blur true; }
+}
+
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// BIND — keybindings tradotti dalla tua keybindings.conf
+// Convenzioni di mapping:
+//   $mainMod (Super) → Mod
+//   exec → spawn (con array di args)
+//   movefocus l/r/u/d → focus-column-{left,right} + focus-window-{up,down}
+//   workspace 1..0 → focus-workspace 1..10
+//   togglegroup → toggle-column-tabbed-display
+//   togglespecialworkspace → toggle-overview (workaround)
+//   togglesplit → consume-window-into-column (rimappato)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+binds {
+    // ───── HOTKEY OVERLAY (mostra tutti i bind al volo) ─────
+    Mod+Shift+Slash { show-hotkey-overlay; }
+
+    // ───── DMS: Control center (era hyprpicker) ─────
+    // Per il color picker DMS ha il proprio: dms ipc call ... in plugins
+    Mod+Shift+P hotkey-overlay-title="Control center" {
+        spawn "dms" "ipc" "call" "control-center" "toggle"
+    }
+
+    // ───── Window/Session actions ─────
+    Mod+Q hotkey-overlay-title="Close window (anti-Steam)" {
+        spawn "sh" "-c" "$HOME/.config/niri/scripts/dontkillsteam.sh"
+    }
+    Alt+F4 { spawn "sh" "-c" "$HOME/.config/niri/scripts/dontkillsteam.sh"; }
+    Mod+Delete { quit; }
+    Mod+W hotkey-overlay-title="Toggle floating" { toggle-window-floating; }
+    Mod+G hotkey-overlay-title="Toggle column tabbed" { toggle-column-tabbed-display; }
+    Alt+Return hotkey-overlay-title="Fullscreen" { fullscreen-window; }
+    Mod+L hotkey-overlay-title="Lock screen (DMS)" {
+        spawn "dms" "ipc" "call" "lock" "lock"
+    }
+    Mod+Shift+F hotkey-overlay-title="Toggle floating + center" {
+        spawn "sh" "-c" "$HOME/.config/niri/scripts/windowpin.sh"
+    }
+    Mod+Backspace hotkey-overlay-title="Power menu (DMS)" {
+        spawn "dms" "ipc" "call" "powermenu" "toggle"
+    }
+    // Toggle DMS bar (era toggle waybar)
+    Ctrl+Alt+W hotkey-overlay-title="Toggle DMS bar" {
+        spawn "dms" "ipc" "call" "bar" "toggle" "index" "0"
+    }
+
+    // ───── Application shortcuts ─────
+    Mod+T { spawn "kitty"; }
+    Mod+E { spawn "dolphin"; }
+    Mod+C { spawn "code"; }
+    Mod+F { spawn "firefox"; }
+    // System monitor — sostituisce sysmonlaunch.sh con un launcher diretto
+    Ctrl+Shift+Escape hotkey-overlay-title="System monitor" {
+        spawn "kitty" "-e" "htop"
+    }
+
+    // ───── DMS: Spotlight / Notifications / Clipboard ─────
+    // Spotlight = launcher app+file+emoji+running windows+calculator
+    Mod+Space hotkey-overlay-title="Spotlight (DMS launcher)" {
+        spawn "dms" "ipc" "call" "spotlight" "toggle"
+    }
+    Mod+A hotkey-overlay-title="Spotlight" {
+        spawn "dms" "ipc" "call" "spotlight" "toggle"
+    }
+    Mod+Tab hotkey-overlay-title="Spotlight" {
+        spawn "dms" "ipc" "call" "spotlight" "toggle"
+    }
+    Mod+Shift+E hotkey-overlay-title="Spotlight (files)" {
+        spawn "dms" "ipc" "call" "widget" "openWith" "launcherButton" "files"
+    }
+    // Notification center
+    Mod+N hotkey-overlay-title="Notifications" {
+        spawn "dms" "ipc" "call" "notifications" "toggle"
+    }
+    Mod+Shift+N hotkey-overlay-title="Dismiss popups" {
+        spawn "dms" "ipc" "call" "notifications" "dismissAllPopups"
+    }
+    // Do Not Disturb
+    Mod+Ctrl+N hotkey-overlay-title="Toggle DND" {
+        spawn "dms" "ipc" "call" "notifications" "toggleDoNotDisturb"
+    }
+
+    // ───── DMS: Audio (sostituisce volumecontrol.sh) ─────
+    Alt+F10 allow-when-locked=true {
+        spawn "dms" "ipc" "call" "audio" "mute"
+    }
+    F11 allow-when-locked=true {
+        spawn "dms" "ipc" "call" "audio" "decrement" "5"
+    }
+    F12 allow-when-locked=true {
+        spawn "dms" "ipc" "call" "audio" "increment" "5"
+    }
+    XF86AudioMute allow-when-locked=true {
+        spawn "dms" "ipc" "call" "audio" "mute"
+    }
+    // Mic mute: DMS non ha mute mic IPC esposto, uso ancora wpctl direttamente
+    XF86AudioMicMute allow-when-locked=true {
+        spawn "wpctl" "set-mute" "@DEFAULT_AUDIO_SOURCE@" "toggle"
+    }
+    XF86AudioLowerVolume allow-when-locked=true {
+        spawn "dms" "ipc" "call" "audio" "decrement" "5"
+    }
+    XF86AudioRaiseVolume allow-when-locked=true {
+        spawn "dms" "ipc" "call" "audio" "increment" "5"
+    }
+
+    // ───── DMS: Media (sostituisce playerctl, usa MPRIS) ─────
+    XF86AudioPlay allow-when-locked=true {
+        spawn "dms" "ipc" "call" "mpris" "playPause"
+    }
+    XF86AudioPause allow-when-locked=true {
+        spawn "dms" "ipc" "call" "mpris" "playPause"
+    }
+    XF86AudioNext allow-when-locked=true {
+        spawn "dms" "ipc" "call" "mpris" "next"
+    }
+    XF86AudioPrev allow-when-locked=true {
+        spawn "dms" "ipc" "call" "mpris" "previous"
+    }
+
+    // ───── DMS: Brightness (sostituisce brightnesscontrol.sh) ─────
+    XF86MonBrightnessUp allow-when-locked=true {
+        spawn "dms" "ipc" "call" "brightness" "increment" "5" ""
+    }
+    XF86MonBrightnessDown allow-when-locked=true {
+        spawn "dms" "ipc" "call" "brightness" "decrement" "5" ""
+    }
+
+    // ───── Color temperature (gammarelay) ─────
+    Alt+F8 {
+        spawn "sh" "-c" "busctl --user -- call rs.wl-gammarelay / rs.wl.gammarelay UpdateTemperature n -3000"
+    }
+    Alt+F9 {
+        spawn "sh" "-c" "busctl --user -- call rs.wl-gammarelay / rs.wl.gammarelay UpdateTemperature n +3000"
+    }
+
+    // ───── Movimento tra finestre/colonne (in stile hyprland mapping) ─────
+    // Frecce: orizzontale = colonne, verticale = finestre dentro colonna
+    Mod+Left  { focus-column-left; }
+    Mod+Right { focus-column-right; }
+    Mod+Up    { focus-window-up; }
+    Mod+Down  { focus-window-down; }
+    // Alt+Tab era "movefocus, d" → focus next finestra (vertical-or-horizontal)
+    Alt+Tab   { focus-window-or-workspace-down; }
+
+    // Niente vim-keys di default: nella tua HyDE Mod+J e Mod+K hanno
+    // già funzioni (togglesplit e keyboardswitch). Se vuoi i vim-keys
+    // crea bind alternativi tipo Mod+Y/U/I/O o cambia il leader.
+
+    // ───── Switch workspace numerati (Super+1..0) ─────
+    // In modalità dinamica niri crea il workspace al volo.
+    Mod+1 { focus-workspace 1; }
+    Mod+2 { focus-workspace 2; }
+    Mod+3 { focus-workspace 3; }
+    Mod+4 { focus-workspace 4; }
+    Mod+5 { focus-workspace 5; }
+    Mod+6 { focus-workspace 6; }
+    Mod+7 { focus-workspace 7; }
+    Mod+8 { focus-workspace 8; }
+    Mod+9 { focus-workspace 9; }
+    Mod+0 { focus-workspace 10; }
+
+    // ───── Cambio workspace relativo (Super+Ctrl+arrow) ─────
+    // NB: in niri i workspace sono verticali. Mappo Right→down, Left→up
+    // per mantenere il muscle memory hyprland (era r+1 / r-1).
+    Mod+Ctrl+Right { focus-workspace-down; }
+    Mod+Ctrl+Left  { focus-workspace-up; }
+    // ex "workspace, empty" — in niri c'è sempre un workspace vuoto in fondo
+    Mod+Ctrl+Down { focus-workspace-down; }
+    Mod+Ctrl+Up   { focus-workspace-up; }
+
+    // ───── Resize finestre/colonne ─────
+    // hyprland: $mainMod+Shift+arrow → resizeactive
+    Mod+Shift+Right { set-column-width "+30"; }
+    Mod+Shift+Left  { set-column-width "-30"; }
+    Mod+Shift+Up    { set-window-height "-30"; }
+    Mod+Shift+Down  { set-window-height "+30"; }
+    // Cicla tra le preset-column-widths
+    Mod+R { switch-preset-column-width; }
+    // NB: Mod+Shift+R è già usato dal wallbash menu (più sotto).
+    //      reset-window-height è disponibile su Mod+X.
+    // Massimizza la colonna in larghezza
+    Mod+M { maximize-column; }
+    Mod+Shift+M { fullscreen-window; }
+
+    // ───── Move-to-workspace (Super+Shift+1..0) ─────
+    Mod+Shift+1 { move-column-to-workspace 1; }
+    Mod+Shift+2 { move-column-to-workspace 2; }
+    Mod+Shift+3 { move-column-to-workspace 3; }
+    Mod+Shift+4 { move-column-to-workspace 4; }
+    Mod+Shift+5 { move-column-to-workspace 5; }
+    Mod+Shift+6 { move-column-to-workspace 6; }
+    Mod+Shift+7 { move-column-to-workspace 7; }
+    Mod+Shift+8 { move-column-to-workspace 8; }
+    Mod+Shift+9 { move-column-to-workspace 9; }
+    Mod+Shift+0 { move-column-to-workspace 10; }
+
+    // ───── Move-to-workspace relativo (Super+Ctrl+Alt) ─────
+    Mod+Ctrl+Alt+Right { move-column-to-workspace-down; }
+    Mod+Ctrl+Alt+Left  { move-column-to-workspace-up; }
+
+    // ───── Move active window (Super+Shift+Ctrl+arrow) ─────
+    // hyprland: $moveactivewindow custom (move floating o tile a seconda)
+    // niri: muove colonne orizzontalmente, finestre verticalmente
+    Mod+Shift+Ctrl+Left  { move-column-left; }
+    Mod+Shift+Ctrl+Right { move-column-right; }
+    Mod+Shift+Ctrl+Up    { move-window-up; }
+    Mod+Shift+Ctrl+Down  { move-window-down; }
+
+    // ───── Move-silent (Super+Alt+1..0) ─────
+    // In niri "silent" = senza seguire la finestra (focus rimane qui).
+    // L'azione è la stessa ma usando l'overload focus=false.
+    Mod+Alt+1 { move-column-to-workspace 1 focus=false; }
+    Mod+Alt+2 { move-column-to-workspace 2 focus=false; }
+    Mod+Alt+3 { move-column-to-workspace 3 focus=false; }
+    Mod+Alt+4 { move-column-to-workspace 4 focus=false; }
+    Mod+Alt+5 { move-column-to-workspace 5 focus=false; }
+    Mod+Alt+6 { move-column-to-workspace 6 focus=false; }
+    Mod+Alt+7 { move-column-to-workspace 7 focus=false; }
+    Mod+Alt+8 { move-column-to-workspace 8 focus=false; }
+    Mod+Alt+9 { move-column-to-workspace 9 focus=false; }
+    Mod+Alt+0 { move-column-to-workspace 10 focus=false; }
+
+    // ───── Mouse wheel = cambia workspace (come hyprland) ─────
+    Mod+WheelScrollDown      cooldown-ms=150 { focus-workspace-down; }
+    Mod+WheelScrollUp        cooldown-ms=150 { focus-workspace-up; }
+    Mod+Shift+WheelScrollDown cooldown-ms=150 { move-column-to-workspace-down; }
+    Mod+Shift+WheelScrollUp   cooldown-ms=150 { move-column-to-workspace-up; }
+
+    // ───── Mouse drag (move/resize) ─────
+    // In niri Mod+ButtonLeft/Right drag funziona automaticamente sui float;
+    // i bind expliciti sotto sono per parità con i tuoi `bindm`.
+    // Mod+MouseLeft  = move (built-in in niri, niente bind)
+    // Mod+MouseRight = resize (built-in in niri, niente bind)
+    Mod+Z hotkey-overlay-title="Move floating" { toggle-window-floating; }
+    Mod+X hotkey-overlay-title="Reset col width" { reset-window-height; }
+
+    // ───── Special workspace (era togglespecial) ─────
+    // niri non ha "special workspace". Mappo Super+S → overview, e
+    // Super+Alt+S → invia la colonna al workspace "scratch" senza seguirla.
+    // Crea il workspace col primo focus, poi sarà sempre lì in cima.
+    Mod+S hotkey-overlay-title="Overview" { toggle-overview; }
+    Mod+Alt+S hotkey-overlay-title="Scratch (no focus)" {
+        // Workaround: muovi su workspace 99, fuori dalla rotazione abituale
+        move-column-to-workspace 99 focus=false
+    }
+
+    // ───── Group navigation (era changegroupactive b/f) ─────
+    // niri: tra finestre in colonna tabbed = focus up/down
+    Mod+Ctrl+H { focus-window-up; }
+    Mod+Ctrl+L { focus-window-down; }
+
+    // ───── Toggle split (era Super+J) ─────
+    // niri non ha dwindle/split. Rimappo a "consume": pulla la finestra
+    // della colonna a destra dentro la colonna corrente.
+    Mod+Period { consume-or-expel-window-right; }
+    Mod+Comma  { consume-or-expel-window-left; }
+
+    // ───── Screenshot ─────
+    // Bind nativi di niri: screenshot interactive UI / screen / window
+    Mod+P hotkey-overlay-title="Screenshot region" { screenshot; }
+    // Screenshot region con editor — sostituisce screenshot.sh sf (HyDE)
+    Mod+Ctrl+P hotkey-overlay-title="Screenshot region + editor" {
+        spawn "sh" "-c" "grim -g \"$(slurp)\" - | swappy -f -"
+    }
+    // Screenshot dello schermo corrente (niri native) — sostituisce screenshot.sh p
+    Mod+Alt+P hotkey-overlay-title="Screenshot monitor" { screenshot-screen; }
+    Print hotkey-overlay-title="Screenshot screen" { screenshot-screen; }
+
+    // ───── DMS: Wallpaper, Theme, Settings ─────
+    Mod+Alt+Right hotkey-overlay-title="Next wallpaper" {
+        spawn "dms" "ipc" "call" "wallpaper" "next"
+    }
+    Mod+Alt+Left hotkey-overlay-title="Prev wallpaper" {
+        spawn "dms" "ipc" "call" "wallpaper" "prev"
+    }
+    Mod+Shift+W hotkey-overlay-title="Wallpaper picker" {
+        spawn "dms" "ipc" "call" "file" "browse" "wallpaper"
+    }
+    // Toggle dark/light theme (DMS gestisce auto via Matugen)
+    Mod+Shift+T hotkey-overlay-title="Toggle theme" {
+        spawn "dms" "ipc" "call" "theme" "toggle"
+    }
+    // Settings UI di DMS
+    Mod+Shift+R hotkey-overlay-title="DMS settings" {
+        spawn "dms" "ipc" "call" "settings" "toggle"
+    }
+    // Spotlight (alias di Mod+A/Tab già sopra, solo per muscle memory HyDE)
+    Mod+Shift+A hotkey-overlay-title="Spotlight" {
+        spawn "dms" "ipc" "call" "spotlight" "toggle"
+    }
+    // Clipboard manager DMS (usa cliphist sotto, UI propria)
+    Mod+V hotkey-overlay-title="Clipboard" {
+        spawn "dms" "ipc" "call" "clipboard" "toggle"
+    }
+    Mod+Shift+V hotkey-overlay-title="Clipboard" {
+        spawn "dms" "ipc" "call" "clipboard" "toggle"
+    }
+    // Process manager
+    Mod+Shift+Escape hotkey-overlay-title="Process list" {
+        spawn "dms" "ipc" "call" "processlist" "focusOrToggle"
+    }
+
+    // ───── Game mode (lo script lavora ancora, swappa config niri) ─────
+    Mod+Alt+G hotkey-overlay-title="Toggle game mode" {
+        spawn "sh" "-c" "$HOME/.config/niri/scripts/gamemode.sh"
+    }
+
+    // ───── Keyboard layout switch (script niri-aware) ─────
+    Mod+K hotkey-overlay-title="Switch keyboard layout" {
+        spawn "sh" "-c" "$HOME/.config/niri/scripts/keyboardswitch.sh"
+    }
+
+    // ───── Keybinds cheatsheet ─────
+    // niri ha già il suo overlay built-in: Mod+Shift+Slash
+    // Lo lascio in mano a quello e libero Mod+Slash.
+
+    // ───── Rimossi (non hanno equivalente DMS o non hanno più senso) ─────
+    //   Mod+Alt+Up/Down (wbarconfgen)  → DMS bar non ha "next style"
+    //   Mod+Slash      (keybinds_hint) → uso Mod+Shift+Slash niri-native
+}
+
+// Mostra il wallpaper nella overview
+layer-rule {
+    match namespace="^quickshell$"
+    place-within-backdrop true
+}
+
+// ╔══════════════════════════════════════════════════════════════════════╗
+// ║  Cose Hyprland che NON ho potuto mappare 1:1 — cerca "TODO" se vuoi   ║
+// ║  cambiarle:                                                           ║
+// ║   • togglespecialworkspace → workaround con overview o ws 99          ║
+// ║   • togglesplit (dwindle) → rimappato a consume-or-expel              ║
+// ║   • windowpin.sh (pin globale) → diventa toggle-floating + center     ║
+// ║   • workspace_swipe orizzontale → niri ha swipe verticale per ws e    ║
+// ║     orizzontale per colonne. È INVERTITO rispetto ad hyprland.        ║
+// ║   • opacity dynamic via hyprctl reload → niri ricarica auto su file   ║
+// ║     change, gli script wallbash possono solo riscrivere config.kdl.   ║
+// ╚══════════════════════════════════════════════════════════════════════╝
