@@ -245,17 +245,27 @@ Trappole già viste:
 - la lettera della chiavetta può cambiare se la stacchi e riattacchi:
   `lsblk` ogni volta prima di `dd`.
 
-**2. Boot e rete.** Avvia dalla chiavetta (UEFI, non legacy). Con il cavo
-ethernet la rete c'è già. In wifi:
+**2. Boot e rete.** Avvia dalla chiavetta (F12 sul ThinkPad, voce USB in
+UEFI, non legacy). Al menu della ISO scegli il kernel **LTS**: vale solo
+per la sessione live, il sistema installato prende il suo dalla config.
+Con il cavo ethernet la rete c'è già. In wifi, la ISO Minimal 26.05 ha
+NetworkManager, ed è l'UNICA via che funziona liscia:
 
-    sudo systemctl start wpa_supplicant
-    wpa_cli
-    > add_network
-    > set_network 0 ssid "NomeRete"
-    > set_network 0 psk "password"
-    > enable_network 0
-    > quit
-    ping nixos.org      # ok? avanti
+    nmcli device wifi connect "NomeRete" password "password"
+    ping -c 3 nixos.org      # ok? avanti
+
+Testato sul T470s (2026-09-04). NON seguire la via `wpa_cli` del manuale:
+in questa ISO il servizio wpa_supplicant parte prima che la scheda esista
+e non la gestisce (`wpa_cli` risponde "Could not connect"), e non c'è né
+dhcpcd né networkd a dare l'IP. Se `nmcli` dice che il device è
+"unavailable", `sudo systemctl restart NetworkManager` e riprova.
+
+Piano B, se proprio NetworkManager non ci fosse: wpa_supplicant a mano
+(`wpa_passphrase "NomeRete" "password" | sudo tee /tmp/wpa.conf` poi
+`sudo wpa_supplicant -B -i wlp58s0 -c /tmp/wpa.conf`) aggancia il router,
+ma l'IP va messo a mano: `sudo ip addr add 192.168.1.77/24 dev wlp58s0`,
+`sudo ip route add default via 192.168.1.1`,
+`echo "nameserver 1.1.1.1" | sudo tee /etc/resolv.conf`.
 
 **3. Partizioni.** Il T470s ha un NVMe: `lsblk` per confermare il nome
 (`/dev/nvme0n1`). Schema semplice, niente swap (c'è zram), le LABEL sono
