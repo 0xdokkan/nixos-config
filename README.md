@@ -280,11 +280,17 @@ Sul **fisso** è identico con `#fisso`, ma occhio: lì Arch vive su
 
 ## Installazione, variante B: prima NixOS "vanilla", poi il flake
 
-Se preferisci l'installer classico (anche quello grafico con Calamares):
-funziona, e il repo finisce direttamente in `~/nixos-config` col
-proprietario giusto. Ma c'è UN passo che non si può saltare.
+**Solo con la ISO grafica (Calamares).** Con la ISO Minimal questa
+variante non ha senso: partizioni e `nixos-generate-config` li fai a mano
+comunque, quindi sei già ai passi 3-4 della variante A e ti conviene
+finire con `nixos-install --flake` lì. Due install per lo stesso risultato
+non servono.
 
-**1. Installa NixOS normale** dalla ISO. Nell'installer scegli:
+Se invece usi Calamares: funziona, e il repo finisce direttamente in
+`~/nixos-config` col proprietario giusto. Ma c'è UN passo che non si può
+saltare.
+
+**1. Installa NixOS normale** dalla ISO grafica. Nell'installer scegli:
 - utente **`dokkan`** (così coincide con la config; la password che metti
   lì resta, `initialPassword` vale solo se l'utente lo crea il flake)
 - desktop: **nessuno** (sarà niri; un GNOME/Plasma scelto qui verrebbe
