@@ -27,6 +27,8 @@ no guilt, just restart.
       kitty/theme.conf         ← Tokyo Night Storm
       zsh/p10k.zsh, extra.zsh  ← prompt + alias personali
       nvim/                    ← LazyVim (symlink live: lazy-lock.json resta scrivibile)
+      dms/                     ← impostazioni DMS (symlink live: la UI di DMS scrive qui,
+                                  poi `git commit`; il tema tokyoNightStorm è dentro)
       cava/config              ← il gradiente
       xdg/applications.menu    ← menu KDE per il "Apri con..." di Dolphin
     templates/{c,rust,zig,python}/
@@ -94,9 +96,11 @@ store finché non li cancelli (è quello che rende possibile il rollback):
 
 **Dotfiles.** home-manager NON copia i tuoi file in `~/.config`: ci mette
 symlink che puntano nello store, quindi sono read-only. Si modificano
-nel repo e si fa il rebuild. Eccezione voluta: `~/.config/nvim` punta
-DENTRO `~/nixos-config/dotfiles/nvim` (symlink "live"), perché lazy.nvim
-deve scrivere il lockfile.
+nel repo e si fa il rebuild. Due eccezioni volute, i symlink "live" che
+puntano DENTRO `~/nixos-config/dotfiles/`: `~/.config/nvim` (lazy.nvim
+scrive il lockfile) e `~/.config/DankMaterialShell` (la UI di DMS scrive
+settings.json). Lì le modifiche le fai dal programma, e poi le committi:
+`git status` in `~/nixos-config` te le mostra.
 
 **Pacchetti non liberi.** `allowUnfree = true` in `common.nix` sblocca
 discord, steam, obsidian, nvidia, claude-code. Senza, nix rifiuta di

@@ -97,6 +97,17 @@ in
     };
   };
 
+  # ══ DMS: le impostazioni (bar, widget, tema tokyoNightStorm, firefox.css) ══
+  # Stessa strategia di nvim: symlink "live" dentro il repo. DMS ci SCRIVE
+  # ogni volta che cambi qualcosa dalla sua UI, quindi non può stare nello
+  # store read-only; così invece le modifiche finiscono nel working tree e
+  # le committi (`git status` te le mostra). Il fisso le eredita al primo
+  # boot: i percorsi assoluti dentro settings.json sono /home/dokkan/..., uguali.
+  # (lo stato — sessione, wallpaper corrente, notepad — resta in
+  #  ~/.local/state/DankMaterialShell, per-macchina, com'è giusto)
+  xdg.configFile."DankMaterialShell".source = config.lib.file.mkOutOfStoreSymlink
+    "${config.home.homeDirectory}/nixos-config/dotfiles/dms";
+
   # Helium (input helium-flake nel flake.nix, modulo HM in sharedModules).
   # Il wrapper aggiunge da solo --ozone-platform-hint=auto quando vede
   # NIXOS_OZONE_WL, che il sistema esporta: wayland nativo, zero flag qui.
