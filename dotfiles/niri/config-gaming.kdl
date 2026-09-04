@@ -1,0 +1,20 @@
+// ╔══════════════════════════════════════════════════════════════════════╗
+// ║  niri config — GAME MODE                                             ║
+// ║                                                                      ║
+// ║  Non è più una copia stale della config: include quella normale e    ║
+// ║  sovrascrive solo ciò che serve al gaming. Validata a build-time da  ║
+// ║  home/desktop.nix insieme a config.kdl.                              ║
+// ║                                                                      ║
+// ║  Toggle: Mod+Alt+G → scripts/gamemode.sh                             ║
+// ║          (niri msg action load-config-file --path <questo file>)     ║
+// ╚══════════════════════════════════════════════════════════════════════╝
+
+include "config.kdl"
+
+layout {
+    gaps 0
+}
+
+animations {
+    off
+}

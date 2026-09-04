@@ -1,16 +1,18 @@
-{ pkgs, ... }:
+{ config, pkgs, ... }:
 
 {
   # ══ zsh — casa tua, come su Arch ════════════════════════════════════
   programs.zsh = {
     enable = true;
     enableCompletion = true;
-    autosuggestion.enable = true;
-    syntaxHighlighting.enable = true;
+    autosuggestion.enable = true;       # era il plugin zsh-autosuggestions
+    syntaxHighlighting.enable = true;   # era il plugin zsh-syntax-highlighting
 
     oh-my-zsh = {
       enable = true;
-      plugins = [ "git" ];   # TODO: i plugin che usi davvero
+      # (zsh-256color non è un plugin omz: su Arch era un pacchetto a parte
+      #  e kitty dichiara già TERM=xterm-kitty a 256 colori)
+      plugins = [ "git" "sudo" ];
     };
 
     # powerlevel10k: il TEMA lo installa nix...
@@ -22,33 +24,40 @@
       }
     ];
 
-    # ...la TUA config p10k e il resto del .zshrc li porti tu:
+    # ...la config p10k e la parte personale del .zshrc sono in dotfiles/zsh/
     initContent = ''
       [[ -f ~/.p10k.zsh ]] && source ~/.p10k.zsh
-      # TODO: migra qui alias/export/funzioni dal tuo .zshrc,
-      # pezzo per pezzo — è l'occasione per buttare i fossili 😄
+      source ${../dotfiles/zsh/extra.zsh}
     '';
   };
 
-  # ═══ ATTENZIONE: NON copiare il tuo .zshrc di Arch com'è! ═══════════
+  # ═══ Perché NON c'è il .zshrc di Arch com'era ═══════════════════════
   # Su NixOS ~/.zshrc lo GENERA home-manager dalle opzioni qui sopra:
-  # il bootstrap (source di oh-my-zsh, caricamento tema p10k, plugin)
-  # è già gestito. Migra SOLO la parte personale — alias, export,
-  # funzioni — in uno di questi due modi:
-  #  - direttamente dentro initContent qui sopra, oppure
-  #  - in dotfiles/zsh/extra.zsh, e in initContent aggiungi la riga:
-  #      source ${../dotfiles/zsh/extra.zsh}
-  # (l'instant prompt di p10k, se lo usi, va in CIMA al file generato:
-  #  wrappa quel blocco con lib.mkBefore in un initContent separato)
+  # source di oh-my-zsh, tema p10k, plugin, integrazioni (zoxide, yazi,
+  # direnv, nix-index...) sono già gestiti. In dotfiles/zsh/extra.zsh c'è
+  # SOLO la parte personale (alias, pokemon); in testa al file è annotato
+  # dove è finito ogni pezzo pacman-specifico che è stato buttato.
 
-  # TODO: copia il tuo ~/.p10k.zsh in dotfiles/zsh/p10k.zsh e scommenta:
+  # la config p10k (identica a ~/.p10k.zsh di Arch)
   home.file.".p10k.zsh".source = ../dotfiles/zsh/p10k.zsh;
+
+  # era `export PATH="$HOME/.local/bin:$PATH"` nel .zshrc
+  home.sessionPath = [ "${config.home.homeDirectory}/.local/bin" ];
 
   # ══ CLI belt — i moduli HM si agganciano a zsh da soli ══════════════
   programs.zoxide.enable = true;
-  programs.eza.enable = true;
+  programs.eza = {
+    enable = true;
+    # gli alias li definisce extra.zsh (come su Arch), non HM
+    enableZshIntegration = false;
+  };
   programs.fastfetch.enable = true;
-  programs.yazi.enable = true;
+  programs.yazi.enable = true;   # la zsh integration genera la funzione `y`
+
+  # Il sostituto del command_not_found_handler basato su `pacman -F`:
+  # "comando X non trovato → è nel pacchetto Y". Serve il DB: dopo il
+  # primo boot lancia `nix-index` una volta (ci mette qualche minuto).
+  programs.nix-index.enable = true;
 
   home.packages = with pkgs; [
     fd
@@ -56,6 +65,8 @@
     htop
     tealdeer
     parallel
-    # TODO: pokemon-colorscripts? cerca su search.nixos.org 👀
+    # il binario si chiama comunque `pokemon-colorscripts` (fork "mac",
+    # ma è python: gira ovunque) → usato in extra.zsh
+    pokemon-colorscripts-mac
   ];
 }

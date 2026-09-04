@@ -1,23 +1,21 @@
-{ pkgs, ... }:
+{ config, pkgs, ... }:
 
+let
+  # ══ niri: config.kdl + config-gaming.kdl validati a BUILD-TIME ══════
+  # (la derivazione è in niri-configs.nix: la usa anche `checks` nel flake)
+  niriConfigs = import ./niri-configs.nix { inherit pkgs; };
+in
 {
-  # ══ niri: il tuo config.kdl, intonso, validato a BUILD-TIME ═════════
-  # Se la config è invalida, il sistema si rifiuta di buildare. ✨
-  xdg.configFile."niri/config.kdl".source =
-    pkgs.runCommand "niri-config-checked"
-      { nativeBuildInputs = [ pkgs.niri ]; } ''
-      niri validate --config ${../dotfiles/niri/config.kdl}
-      cp ${../dotfiles/niri/config.kdl} $out
-    '';
+  xdg.configFile."niri/config.kdl".source        = "${niriConfigs}/config.kdl";
+  xdg.configFile."niri/config-gaming.kdl".source = "${niriConfigs}/config-gaming.kdl";
 
-  # Gli script che config.kdl chiama (dontkillsteam.sh & co.)
-  # → copiali in dotfiles/niri/scripts/ con l'exec bit (vedi README lì)
+  # Gli script che config.kdl chiama (dontkillsteam.sh & co.), con exec bit
   xdg.configFile."niri/scripts" = {
     source = ../dotfiles/niri/scripts;
     recursive = true;
   };
 
-  # ══ Gli attrezzi wayland che config.kdl / il tuo workflow usano ═════
+  # ══ Gli attrezzi wayland che config.kdl / gli script usano ══════════
   home.packages = with pkgs; [
     # screenshot pipeline (bind Mod+Ctrl+P)
     grim
@@ -27,7 +25,7 @@
     wl-clipboard
     cliphist
     # colore/luminosità/audio
-    wl-gammarelay
+    wl-gammarelay-rs     # la riscrittura Rust: è quella con il bus rs.wl-gammarelay
     brightnessctl
     pamixer
     pavucontrol
@@ -35,20 +33,126 @@
     udiskie
     # notifiche da script
     libnotify
-    # TODO: le tue app — firefox, librewolf, webcord, obsidian, anki,
-    # calibre, qbittorrent, gimp, kitty è sotto come programs.kitty...
+    # dontkillsteam.sh: unmap della finestra X11 di Steam
+    xdotool
+
+    # ══ Le app (da `pacman -Qe` di Arch, con le stesse config.kdl rules) ══
+    # browser — librewolf è il default (xdg.mimeApps sotto), firefox è Mod+F,
+    # helium (PDF) è sotto come programs.helium
+    librewolf
+    firefox
+    tor-browser
+    # editor: neovim (dev.nix), Mod+C apre `kitty nvim`. vscode è stato tolto.
+    # chat
+    webcord
+    discord
+    # studio / note / libri
+    obsidian
+    anki-bin
+    calibre
+    # office (fresh/still non esistono più upstream: -stable è l'unico nome)
+    libreoffice-stable
+    onlyoffice-desktopeditors
+    # media & grafica
+    qbittorrent
+    gimp
+    cava
+    # dev GUI (i toolchain restano nelle devshell)
+    godot
+    # KDE: dolphin (Mod+E) + ark, e ciò che serve fuori da Plasma
+    kdePackages.dolphin
+    kdePackages.ark
+    kdePackages.kio-extras              # sftp, trash, thumbnail...
+    kdePackages.qtsvg                   # icone svg, altrimenti sono vuote
+    kdePackages.ffmpegthumbs            # anteprime video
+    kdePackages.kdegraphics-thumbnailers
   ];
 
-  # ══ Terminale ═══════════════════════════════════════════════════════
-  programs.kitty.enable = true;
-  # TODO: porta la tua config — o via opzioni HM (programs.kitty.settings)
-  # o linkando il file com'è:
-  # xdg.configFile."kitty/kitty.conf".source = ../dotfiles/kitty/kitty.conf;
+  # Helium (input helium-flake nel flake.nix, modulo HM in sharedModules).
+  # Il wrapper aggiunge da solo --ozone-platform-hint=auto quando vede
+  # NIXOS_OZONE_WL, che il sistema esporta: wayland nativo, zero flag qui.
+  programs.helium.enable = true;
 
-  # ══ Gli altri dotfiles, stesso pattern del link ═════════════════════
-  # TODO: copia le cartelle in dotfiles/ e scommenta man mano
-  # xdg.configFile."hyprlock".source = ../dotfiles/hyprlock;
-  # xdg.configFile."cava".source = ../dotfiles/cava;
-  # xdg.configFile."fastfetch".source = ../dotfiles/fastfetch;
-  # home.file.".gdbinit".source = ../dotfiles/gdb/gdbinit;   # 🚩
+  # virt-manager: si connette a qemu:///system da solo, altrimenti la
+  # finestra è vuota. (richiede programs.dconf a sistema ✓)
+  dconf.settings."org/virt-manager/virt-manager/connections" = {
+    autoconnect = [ "qemu:///system" ];
+    uris = [ "qemu:///system" ];
+  };
+
+  # ══ Terminale ═══════════════════════════════════════════════════════
+  # kitty.conf lo GENERA home-manager da queste opzioni (non si può linkare
+  # il file com'era: HM scrive lui ~/.config/kitty/kitty.conf).
+  programs.kitty = {
+    enable = true;
+    font = {
+      name = "Monaspace Argon";   # a sistema in fonts.packages
+      size = 9;
+    };
+    settings = {
+      enable_audio_bell = false;
+      window_padding_width = 25;
+      bold_font = "auto";
+      italic_font = "auto";
+      bold_italic_font = "auto";
+    };
+    keybindings = {
+      "shift+enter" = "send_text all \\e\\r";
+    };
+    # il tema Tokyo Night Storm, com'era su Arch
+    extraConfig = "include theme.conf";
+  };
+  xdg.configFile."kitty/theme.conf".source = ../dotfiles/kitty/theme.conf;
+
+  # ══ Gli altri dotfiles ══════════════════════════════════════════════
+  # cava: solo il gradiente custom (il resto sono i default)
+  xdg.configFile."cava/config".source = ../dotfiles/cava/config;
+
+  # swappy: path assoluto → generato, così segue home.homeDirectory.
+  # (su Arch il formato era rimasto "espanso" da un salvataggio dalla GUI:
+  #  qui torna a essere un pattern strftime)
+  xdg.configFile."swappy/config".text = ''
+    [Default]
+    save_dir=${config.home.homeDirectory}/Pictures/Screenshots
+    save_filename_format=%y%m%d_%Hh%Mm%Ss_screenshot.png
+  '';
+  # la cartella deve esistere: la usano swappy e screenshot-path di niri
+  home.file."Pictures/Screenshots/.keep".text = "";
+
+  # hyprlock: NON portato — il lock è DMS (Mod+L → dms ipc call lock lock).
+  # fastfetch: nessuna config custom su Arch → programs.fastfetch (shell.nix).
+  # .gdbinit: in dev.nix 🚩
+
+  # ══ XDG: cartelle utente e app di default (era ~/.config/mimeapps.list) ══
+  xdg.userDirs = {
+    enable = true;
+    createDirectories = true;
+    extraConfig.XDG_PROJECTS_DIR = "${config.home.homeDirectory}/Projects";
+  };
+
+  xdg.mimeApps = {
+    enable = true;
+    defaultApplications = {
+      "text/html"                = "librewolf.desktop";
+      "x-scheme-handler/http"    = "librewolf.desktop";
+      "x-scheme-handler/https"   = "librewolf.desktop";
+      "x-scheme-handler/about"   = "librewolf.desktop";
+      "x-scheme-handler/unknown" = "librewolf.desktop";
+      # PDF e fumetti → helium, come su Arch
+      "application/pdf"               = "helium.desktop";
+      "application/x-ext-pdf"         = "helium.desktop";
+      "application/x-bzpdf"           = "helium.desktop";
+      "application/x-gzpdf"           = "helium.desktop";
+      "application/vnd.comicbook+zip" = "helium.desktop";
+      "application/vnd.comicbook-rar" = "helium.desktop";
+      "application/json"         = "nvim.desktop";
+      "application/x-zerosize"   = "nvim.desktop";
+      "text/plain"               = "nvim.desktop";
+      "text/markdown"            = "nvim.desktop";
+      "text/x-csrc"              = "nvim.desktop";
+      "text/x-c++src"            = "nvim.desktop";
+      "text/x-python"            = "nvim.desktop";
+      "text/x-shellscript"       = "nvim.desktop";
+    };
+  };
 }

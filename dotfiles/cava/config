@@ -1,0 +1,15 @@
+## cava — solo la parte personalizzata rispetto ai default
+## (il file di Arch era il template completo con tutto commentato +
+##  questo gradiente in fondo; il resto dei valori è il default di cava)
+
+[color]
+gradient = 1
+gradient_count = 8
+gradient_color_1 = '#FFF8CC'
+gradient_color_2 = '#F0E6AA'
+gradient_color_3 = '#9ABEE6'
+gradient_color_4 = '#7A9CC2'
+gradient_color_5 = '#657FA3'
+gradient_color_6 = '#576E8F'
+gradient_color_7 = '#7D4B7D'
+gradient_color_8 = '#6B3A6B'

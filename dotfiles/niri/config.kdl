@@ -678,7 +678,8 @@ binds {
     // ───── Application shortcuts ─────
     Mod+T { spawn "kitty"; }
     Mod+E { spawn "dolphin"; }
-    Mod+C { spawn "code"; }
+    // era `code`: ora l'editor è neovim dentro kitty
+    Mod+C hotkey-overlay-title="Neovim" { spawn "kitty" "nvim"; }
     Mod+F { spawn "firefox"; }
     // System monitor — sostituisce sysmonlaunch.sh con un launcher diretto
     Ctrl+Shift+Escape hotkey-overlay-title="System monitor" {
