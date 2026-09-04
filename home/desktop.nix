@@ -114,11 +114,12 @@ in
   # il file com'era: HM scrive lui ~/.config/kitty/kitty.conf).
   programs.kitty = {
     enable = true;
-    font = {
-      name = "Monaspace Argon";   # a sistema in fonts.packages
-      size = 9;
-    };
     settings = {
+      # Il font per nome PostScript, inequivocabile: nixpkgs `monaspace`
+      # installa anche le varianti Var/Frozen/NF con lo stesso prefisso.
+      # (pacchetto a sistema in fonts.packages; `fc-list : postscriptname`)
+      font_family = "postscript_name=MonaspaceArgon-Regular";
+      font_size = 9;
       enable_audio_bell = false;
       window_padding_width = 25;
       bold_font = "auto";

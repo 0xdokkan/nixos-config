@@ -4,6 +4,36 @@
 # ╚════════════════════════════════════════════════════════════════════╝
 { config, pkgs, ... }:
 
+let
+  # ══ Il tema di SDDM ══════════════════════════════════════════════════
+  # Su Arch c'era "Candy" (Sugar Candy di HyDE), che è Qt5: SDDM in nixpkgs
+  # da 25.11 è solo Qt6 e non lo carica. sddm-astronaut DISCENDE da Sugar
+  # Candy, è Qt6 ed è in nixpkgs: gli passiamo lo stesso sfondo e le stesse
+  # impostazioni di Candy (theme.conf di Arch) e il risultato è quello.
+  sddmTheme = pkgs.sddm-astronaut.override {
+    embeddedTheme = "astronaut";
+    themeConfig = {
+      Background = "${../dotfiles/sddm/bg.png}";   # il bg.png di Candy
+      ScreenWidth = "1920";
+      ScreenHeight = "1080";
+      CropBackground = "true";
+      DimBackground = "0.0";
+      FullBlur = "false";
+      PartialBlur = "true";
+      HaveFormBackground = "true";
+      FormPosition = "left";
+      BackgroundColor = "#444";
+      RoundCorners = "20";
+      Font = "Noto Sans";
+      HourFormat = "hh:mm A";
+      DateFormat = "dddd, d of MMMM";
+      HeaderText = "码农万岁";
+      ForceLastUser = "true";
+      PasswordFocus = "true";
+      HideCompletePassword = "false";
+    };
+  };
+in
 {
   # ══ Nix stesso ══════════════════════════════════════════════════════
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
@@ -85,6 +115,9 @@
   services.displayManager.sddm = {
     enable = true;
     wayland.enable = true;
+    theme = "sddm-astronaut-theme";   # = sddmTheme (in systemPackages sotto)
+    # i moduli QML che il tema importa devono stare nel path del greeter
+    extraPackages = with pkgs.kdePackages; [ qtsvg qtmultimedia qtvirtualkeyboard ];
   };
 
   security.polkit.enable = true;   # DMS ha il suo agent, ma il demone è qui
@@ -111,6 +144,7 @@
     vim
     wget
     git
+    sddmTheme            # SDDM cerca i temi in /run/current-system/sw/share/sddm/themes
   ];
 
   # ══ Audio (tutta la pila pipewire di Arch → questo blocco) ══════════
@@ -168,6 +202,8 @@
                                  # non ha i glifi → fallback via fontconfig
     noto-fonts-color-emoji       # ttf-apple-emoji non è in nixpkgs
                                  # (licenza Apple), questo è lo standard
+    noto-fonts                   # "Noto Sans": il font del login (Candy lo
+                                 # usava) e un sans decente per tutto il resto
   ];
   fonts.fontconfig.defaultFonts.emoji = [ "Noto Color Emoji" ];
 

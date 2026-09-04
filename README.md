@@ -373,7 +373,10 @@ dell'installer non serve più: il flake lo ignora, puoi cancellarlo.
        sudo mv /etc/nixos-config ~/nixos-config
        sudo chown -R dokkan:users ~/nixos-config
 
+   Finché non lo fai, `~/.config/nvim` è un link rotto e nvim parte
+   nudo, senza LazyVim (successo: 2026-09-05).
 3. `cd ~/nixos-config && git commit -am "portatilino: hardware-configuration vero" && git push`
+   (fatto per portatilino il 2026-09-05: il suo hardware-config vero è nel repo)
 4. `nix-index` (una volta: il DB per "comando non trovato → pacchetto")
 5. apri `nvim`: lazy.nvim scarica i plugin da `dotfiles/nvim/lazy-lock.json`
 6. `mullvad account login` / login Steam / `docker run hello-world`
