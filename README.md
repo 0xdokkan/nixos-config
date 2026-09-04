@@ -267,6 +267,15 @@ ma l'IP va messo a mano: `sudo ip addr add 192.168.1.77/24 dev wlp58s0`,
 `sudo ip route add default via 192.168.1.1`,
 `echo "nameserver 1.1.1.1" | sudo tee /etc/resolv.conf`.
 
+**2b. Tastiera italiana nella live** (il T470s ce l'ha, la live parte in US):
+
+    sudo loadkeys it
+
+Nel sistema installato non serve fare nulla: `hosts/portatilino` dichiara
+`services.xserver.xkb.layout = "it"` e da lì lo prendono SDDM, la console
+e niri (che riceve un `host.kdl` generato: `config.kdl` è condiviso col
+fisso, che è US). Vuoi entrambi con Mod+K per ciclare? `"it,us"`.
+
 **3. Partizioni.** Il T470s ha un NVMe: `lsblk` per confermare il nome
 (`/dev/nvme0n1`). Schema semplice, niente swap (c'è zram), le LABEL sono
 quelle che il placeholder e i comandi sotto si aspettano. ⚠️ CANCELLA IL

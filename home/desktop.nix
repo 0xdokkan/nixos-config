@@ -1,13 +1,18 @@
-{ config, pkgs, ... }:
+{ config, osConfig, pkgs, ... }:
 
 let
-  # ══ niri: config.kdl + config-gaming.kdl validati a BUILD-TIME ══════
+  # ══ niri: config.kdl + config-gaming.kdl + host.kdl validati a BUILD-TIME ══
   # (la derivazione è in niri-configs.nix: la usa anche `checks` nel flake)
-  niriConfigs = import ./niri-configs.nix { inherit pkgs; };
+  # osConfig = la config NixOS dell'host: da lì arriva il layout tastiera.
+  niriConfigs = import ./niri-configs.nix {
+    inherit pkgs;
+    layout = osConfig.services.xserver.xkb.layout;
+  };
 in
 {
   xdg.configFile."niri/config.kdl".source        = "${niriConfigs}/config.kdl";
   xdg.configFile."niri/config-gaming.kdl".source = "${niriConfigs}/config-gaming.kdl";
+  xdg.configFile."niri/host.kdl".source          = "${niriConfigs}/host.kdl";
 
   # Gli script che config.kdl chiama (dontkillsteam.sh & co.), con exec bit
   xdg.configFile."niri/scripts" = {

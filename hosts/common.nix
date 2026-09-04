@@ -24,7 +24,9 @@
   # ══ Localizzazione ══════════════════════════════════════════════════
   time.timeZone = "Europe/Rome";
   i18n.defaultLocale = "en_US.UTF-8";
-  # console.keyMap = "us";
+  # Layout tastiera: services.xserver.xkb.layout, per-host (il fisso ha il
+  # default "us", il portatile "it"). La console lo deriva da lì:
+  console.useXkbConfig = true;
 
   # ══ Utente ══════════════════════════════════════════════════════════
   users.users.dokkan = {

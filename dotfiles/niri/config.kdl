@@ -16,15 +16,24 @@
 
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// PER-HOST — generato da nix nella stessa cartella (layout tastiera)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+include "host.kdl"
+
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // INPUT — tastiera, touchpad, mouse
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 input {
     keyboard {
         xkb {
-            // Aggiungi altre layout qui se vuoi che keyboardswitch.sh
-            // possa ciclare tra più. Esempio: layout "us,it"
-            layout "us"
+            // Il layout NON è qui: questo file è condiviso tra fisso (US)
+            // e portatilino (IT). Sta in host.kdl, generato da home-manager
+            // dal valore di services.xserver.xkb.layout dell'host
+            // (vedi home/niri-configs.nix). Con "it,us" keyboardswitch.sh
+            // (Mod+K) cicla tra i due.
         }
         // Equivalente di numlock_by_default = true
         numlock

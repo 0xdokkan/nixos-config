@@ -12,6 +12,9 @@
 
   networking.hostName = "fisso";
 
+  # Tastiera: US, cioè il default di services.xserver.xkb.layout.
+  # (il portatile invece dichiara "it" — vedi hosts/portatilino)
+
   # ══ CPU ═════════════════════════════════════════════════════════════
   hardware.cpu.intel.updateMicrocode = true;   # Coffee Lake, i7-9700K
 

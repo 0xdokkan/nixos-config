@@ -12,6 +12,12 @@
 
   networking.hostName = "portatilino";
 
+  # ══ Tastiera italiana ═══════════════════════════════════════════════
+  # Unica fonte di verità per il layout: la leggono SDDM, la console
+  # (console.useXkbConfig in common.nix) e niri (home/niri-configs.nix
+  # genera host.kdl da qui). Con "it,us" Mod+K cicla tra i due.
+  services.xserver.xkb.layout = "it";
+
   # ══ CPU ═════════════════════════════════════════════════════════════
   hardware.cpu.intel.updateMicrocode = true;   # Kaby Lake, i5/i7-7xxxU
 
