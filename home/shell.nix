@@ -65,8 +65,9 @@
     htop
     tealdeer
     parallel
-    # il binario si chiama comunque `pokemon-colorscripts` (fork "mac",
-    # ma è python: gira ovunque) → usato in extra.zsh
-    pokemon-colorscripts-mac
+    # quello VERO in python (come pokemon-colorscripts-git su Arch): capisce
+    # `--no-title -r 1,3,6` di extra.zsh. NON `pokemon-colorscripts-mac`: è
+    # la vecchia versione bash, senza filtro generazioni → "too many arguments"
+    pokemon-colorscripts
   ];
 }
