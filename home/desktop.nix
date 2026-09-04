@@ -40,6 +40,13 @@ in
     libnotify
     # dontkillsteam.sh: unmap della finestra X11 di Steam
     xdotool
+    # SENZA questo, nessuna icona delle app qui sotto viene trovata:
+    # è lui che mette share/icons/hicolor/index.theme nel profilo utente,
+    # e chi cerca un'icona per nome (DMS, Qt, GTK) senza index.theme non
+    # guarda nemmeno nella cartella. Scoperto al primo boot: si vedevano
+    # solo steam (profilo di sistema, che l'index ce l'ha) e helium
+    # (percorso assoluto nel .desktop).
+    hicolor-icon-theme
 
     # ══ Le app (da `pacman -Qe` di Arch, con le stesse config.kdl rules) ══
     # browser — librewolf è il default (xdg.mimeApps sotto), firefox è Mod+F,
@@ -72,6 +79,23 @@ in
     kdePackages.ffmpegthumbs            # anteprime video
     kdePackages.kdegraphics-thumbnailers
   ];
+
+  # ══ Icone: tema selezionato (NON theming estetico, quello lo fa DMS) ══
+  # hicolor sopra copre le app che portano la propria icona. Restano i nomi
+  # generici che nessuna app fornisce ("system-file-manager" di Dolphin,
+  # "multimedia-volume-control" di pavucontrol) e le icone interne di
+  # Dolphin/Ark (toolbar, cartelle): serve un tema vero, selezionato.
+  # breeze è quello che le app KDE si aspettano. Lo legge DMS quando
+  # l'icon theme è "System Default", via dconf (programs.dconf a sistema ✓).
+  # Vuoi il Tela-circle-purple di Arch? pkgs.tela-circle-icon-theme,
+  # name "Tela-circle-purple".
+  gtk = {
+    enable = true;
+    iconTheme = {
+      name = "breeze";
+      package = pkgs.kdePackages.breeze-icons;
+    };
+  };
 
   # Helium (input helium-flake nel flake.nix, modulo HM in sharedModules).
   # Il wrapper aggiunge da solo --ozone-platform-hint=auto quando vede
