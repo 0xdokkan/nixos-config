@@ -218,9 +218,32 @@ Prerequisito: questo repo pushato su GitHub (o su una chiavetta). Il
 esattamente il sistema che abbiamo buildato e verificato da Arch.
 
 **1. La chiavetta.** Da https://nixos.org/download scarica la ISO
-*Minimal* (solo terminale, basta e avanza) e scrivila:
+*Minimal* (solo terminale, basta e avanza). Su Linux non si "monta": si
+scrive l'immagine sopra tutta la chiavetta con `dd`, che è quello che fa
+Etcher sotto il cofano. Da Arch, sul fisso:
 
-    sudo dd if=nixos-minimal-*.iso of=/dev/sdX bs=4M status=progress oflag=sync
+    # 1) integra? confronta con l'hash sulla pagina di download
+    sha256sum /home/raven/Downloads/nixos-minimal-*.iso
+
+    # 2) QUALE disco è la chiavetta: guarda dimensione e modello.
+    #    sdb è Arch, nvme0n1 Windows, sda l'HDD: NON quelli.
+    lsblk -o NAME,SIZE,TYPE,TRAN,MODEL,MOUNTPOINTS
+
+    # 3) smonta eventuali partizioni della chiavetta (in silenzio se non serve)
+    sudo umount /dev/sdX* 2>/dev/null
+
+    # 4) scrivi: il DISCO INTERO (sdX), mai una partizione (sdX1). Irreversibile.
+    sudo dd if=/home/raven/Downloads/nixos-minimal-26.05.XXXX-x86_64-linux.iso \
+            of=/dev/sdX bs=4M status=progress oflag=sync
+    sync
+
+Trappole già viste:
+- `zsh: no matches found: if=nixos-minimal-*.iso` → non sei nella cartella
+  della ISO. zsh si rifiuta di eseguire un jolly che non trova nulla.
+- `dd: failed to open '~/Downloads/...'` → dentro `if=~/...` zsh NON
+  espande la tilde (solo a inizio parola). Usa il percorso assoluto o `$HOME`.
+- la lettera della chiavetta può cambiare se la stacchi e riattacchi:
+  `lsblk` ogni volta prima di `dd`.
 
 **2. Boot e rete.** Avvia dalla chiavetta (UEFI, non legacy). Con il cavo
 ethernet la rete c'è già. In wifi:
