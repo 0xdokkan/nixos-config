@@ -57,8 +57,8 @@
     {
       # ── I sistemi: `sudo nixos-rebuild switch --flake .#<nome>` ──
       nixosConfigurations = {
-        portatilino = mkHost "portatilino";   # ThinkPad T470s, Intel
-        fisso       = mkHost "fisso";         # desktop, RTX 2070 nvidia
+        armoredcoreVIP = mkHost "armoredcoreVIP";   # ThinkPad T470s, Intel
+        armoredcoreVIF = mkHost "armoredcoreVIF";   # il fisso: RTX 2070 nvidia
       };
 
       # ── `nix flake check` COSTRUISCE questi: niri validate sui due config.kdl ──

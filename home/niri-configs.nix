@@ -11,7 +11,7 @@
 # a vicenda con path relativi:
 #   config-gaming.kdl → include "config.kdl" → include "host.kdl"
 #
-# host.kdl è l'UNICO pezzo di niri che cambia tra fisso e portatilino:
+# host.kdl è l'UNICO pezzo di niri che cambia tra fisso e armoredcoreVIP:
 # il layout della tastiera (US sul fisso, IT sul portatile). Lo generiamo
 # qui dal valore che l'host dichiara in services.xserver.xkb.layout.
 { pkgs, layout ? "us" }:

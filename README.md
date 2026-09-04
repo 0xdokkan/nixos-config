@@ -1,4 +1,4 @@
-# nixos-config — portatilino & fisso
+# nixos-config — armoredcoreVIP (portatile) & armoredcoreVIF (fisso)
 
 Il sistema come sorgente. Rice versionato, rollback dal bootloader,
 no guilt, just restart.
@@ -9,8 +9,8 @@ no guilt, just restart.
     hosts/
       common.nix               ← tutto ciò che è uguale sui due pc: niri+DMS+SDDM, pipewire,
                                   utente, steam, docker, libvirt, mullvad, wireshark, font...
-      portatilino/             ← ThinkPad T470s: Intel HD 620, thermald, batteria
-      fisso/                   ← desktop: RTX 2070 (nvidia-open), env var nvidia per niri
+      armoredcoreVIP/          ← il portatile, ThinkPad T470s: Intel HD 620, thermald, batteria
+      armoredcoreVIF/          ← il fisso: RTX 2070 (nvidia-open), env var nvidia per niri
         configuration.nix      ← le differenze dell'host + `imports = [ ../common.nix ]`
         hardware-configuration.nix  ← PLACEHOLDER: lo genera l'installer, uno per macchina
     home/                      ← la home di dokkan, identica su entrambi
@@ -63,7 +63,7 @@ il sistema nuovo accanto a quello vecchio, poi sposta un symlink. Ogni
 switch è una *generazione*: la vedi nel menu di systemd-boot, e se hai
 rotto qualcosa scegli quella prima e sei a posto. Da terminale:
 
-    sudo nixos-rebuild switch --flake ~/nixos-config#portatilino   # applica
+    sudo nixos-rebuild switch --flake ~/nixos-config#armoredcoreVIP   # applica
     sudo nixos-rebuild switch --rollback                            # torna indietro
     sudo nix-env --list-generations -p /nix/var/nix/profiles/system # storico
 
@@ -72,7 +72,7 @@ home-manager e helium: due rebuild con lo stesso lock danno lo stesso
 sistema. Per aggiornare tutto (`pacman -Syu`) si sposta il lock:
 
     nix flake update          # scarica le versioni nuove nel lock
-    sudo nixos-rebuild switch --flake ~/nixos-config#portatilino
+    sudo nixos-rebuild switch --flake ~/nixos-config#armoredcoreVIP
     git commit -am "bump"     # il lock è versionato: rollback anche dell'update
 
 **Cercare un pacchetto.** https://search.nixos.org (pacchetti E opzioni),
@@ -116,20 +116,20 @@ privata di una `.pub` elencata in `users.users.dokkan.openssh.authorizedKeys.key
 **Collegarsi.** La privata sta sulla macchina DA CUI parti. Oggi ce l'ha
 il fisso (`~/.ssh/id_ed25519`, la sua `.pub` è già in `dotfiles/ssh/`):
 
-    ssh dokkan@portatilino        # dal fisso, funziona subito dopo l'install
+    ssh dokkan@armoredcoreVIP        # dal fisso, funziona subito dopo l'install
     ssh dokkan@192.168.x.y        # se il nome non si risolve: `ip a` sul portatile
 
 **Aggiungere una macchina** (es. dal portatile vuoi entrare nel fisso):
 una chiave nuova per macchina, nessun file segreto da spostare.
 
-    ssh-keygen -t ed25519 -C "dokkan@portatilino"          # sul portatile
-    cp ~/.ssh/id_ed25519.pub ~/nixos-config/dotfiles/ssh/id_ed25519_portatilino.pub
+    ssh-keygen -t ed25519 -C "dokkan@armoredcoreVIP"          # sul portatile
+    cp ~/.ssh/id_ed25519.pub ~/nixos-config/dotfiles/ssh/id_ed25519_armoredcoreVIP.pub
 
 poi in `common.nix`:
 
     openssh.authorizedKeys.keyFiles = [
       ../dotfiles/ssh/id_ed25519.pub
-      ../dotfiles/ssh/id_ed25519_portatilino.pub
+      ../dotfiles/ssh/id_ed25519_armoredcoreVIP.pub
     ];
 
 rebuild, commit, push: al prossimo rebuild anche l'altro host la accetta.
@@ -166,11 +166,11 @@ Per aggiungere una libreria: `shell.nix` del progetto, riga nella lista,
 
 - [x] script niri, p10k, nvim, kitty, cava: dentro e linkati
 - [x] `home/dev.nix`: nome/email git
-- [x] `hosts/portatilino`: microcode Intel, grafica Intel HD 620, niente nvidia
-- [x] `hosts/fisso`: RTX 2070 con nvidia-open, env var nvidia nella sessione
+- [x] `hosts/armoredcoreVIP`: microcode Intel, grafica Intel HD 620, niente nvidia
+- [x] `hosts/armoredcoreVIF`: RTX 2070 con nvidia-open, env var nvidia nella sessione
 - [x] `home/desktop.nix`: lista app (da `pacman -Qe` di Arch — sfoltisci pure)
 - [ ] `hardware-configuration.nix`: SOLO durante l'install, per ciascuna macchina
-- [ ] `hostname`/`user`: `portatilino` o `fisso`, utente `dokkan` (su Arch era `raven`)
+- [ ] `hostname`/`user`: `armoredcoreVIP` (portatile) o `armoredcoreVIF` (fisso), utente `dokkan` (su Arch era `raven`)
 - [ ] MAI committare: chiavi PRIVATE ssh/gpg, token, history
       (`dotfiles/ssh/id_ed25519.pub` è la pubblica: quella sì, serve a sshd)
 - [ ] ssh: la privata `~/.ssh/id_ed25519` sta sulla macchina DA CUI ti
@@ -187,11 +187,11 @@ Per aggiungere una libreria: `shell.nix` del progetto, riga nella lista,
 
     # da Arch: costruisce TUTTO il sistema in /nix/store senza installare
     # nulla (prova definitiva; occupa spazio, poi `nix store gc`)
-    nix build .#nixosConfigurations.portatilino.config.system.build.toplevel
+    nix build .#nixosConfigurations.armoredcoreVIP.config.system.build.toplevel
 
     # da Arch: builda la VM di prova e avviala
-    nixos-rebuild build-vm --flake .#portatilino
-    ./result/bin/run-portatilino-vm
+    nixos-rebuild build-vm --flake .#armoredcoreVIP
+    ./result/bin/run-armoredcoreVIP-vm
 
     # installare da zero: vedi la sezione "Installazione" qui sotto
 
@@ -199,11 +199,11 @@ Per aggiungere una libreria: `shell.nix` del progetto, riga nella lista,
     # live installer, con ssh verso il fisso, i pacchetti arrivano dalla LAN
     # invece che da internet. Finché il fisso è Arch, lì serve
     # `sudo systemctl start sshd` (è spento) e la tua chiave sul live.
-    nix copy --from ssh://raven@fisso /nix/store/<hash>-nixos-system-portatilino-*
+    nix copy --from ssh://raven@192.168.1.12 /nix/store/<hash>-nixos-system-armoredcoreVIP-*
 
     # ciclo di vita, per sempre (sul pc giusto!):
-    sudo nixos-rebuild switch --flake ~/nixos-config#portatilino
-    sudo nixos-rebuild switch --flake ~/nixos-config#fisso
+    sudo nixos-rebuild switch --flake ~/nixos-config#armoredcoreVIP
+    sudo nixos-rebuild switch --flake ~/nixos-config#armoredcoreVIF
 
     # aggiornare gli input (nixpkgs, HM, helium) e poi rebuild:
     nix flake update
@@ -271,7 +271,7 @@ ma l'IP va messo a mano: `sudo ip addr add 192.168.1.77/24 dev wlp58s0`,
 
     sudo loadkeys it
 
-Nel sistema installato non serve fare nulla: `hosts/portatilino` dichiara
+Nel sistema installato non serve fare nulla: `hosts/armoredcoreVIP` dichiara
 `services.xserver.xkb.layout = "it"` e da lì lo prendono SDDM, la console
 e niri (che riceve un `host.kdl` generato: `config.kdl` è condiviso col
 fisso, che è US). Vuoi entrambi con Mod+K per ciclare? `"it,us"`.
@@ -305,19 +305,19 @@ chiedi prima di formattare.)
     git clone https://github.com/<tu>/nixos-config /mnt/etc/nixos-config
     # (se manca git: nix shell nixpkgs#git)
     cp /mnt/etc/nixos/hardware-configuration.nix \
-       /mnt/etc/nixos-config/hosts/portatilino/hardware-configuration.nix
+       /mnt/etc/nixos-config/hosts/armoredcoreVIP/hardware-configuration.nix
     cd /mnt/etc/nixos-config && git add -A
     # ↑ OBBLIGATORIO: i flake vedono solo i file tracciati, senza `git add`
     #   nixos-install userebbe ancora il placeholder e non troverebbe il disco
 
 **5. Installa.**
 
-    nixos-install --flake /mnt/etc/nixos-config#portatilino
+    nixos-install --flake /mnt/etc/nixos-config#armoredcoreVIP
     # scarica tutto (o quasi: vedi nota nix copy in "Comandi"), alla fine
     # chiede la password di ROOT. Quella di dokkan è "cambiami".
     reboot
 
-Sul **fisso** è identico con `#fisso`, ma occhio: lì Arch vive su
+Sul **fisso** è identico con `#armoredcoreVIF`, ma occhio: lì Arch vive su
 `/dev/sdb`. Usa un altro disco, oppure chiedi per un dual-boot fatto bene.
 
 ## Installazione, variante B: prima NixOS "vanilla", poi il flake
@@ -350,18 +350,18 @@ repo cerca un disco con label `nixos`, che l'installer classico NON mette
 (usa gli UUID). Senza questa copia il rebuild riesce ma la nuova
 generazione al boot non trova la root.
 
-    cp /etc/nixos/hardware-configuration.nix hosts/portatilino/
-    git add hosts/portatilino/hardware-configuration.nix     # i flake vedono solo file tracciati
+    cp /etc/nixos/hardware-configuration.nix hosts/armoredcoreVIP/
+    git add hosts/armoredcoreVIP/hardware-configuration.nix     # i flake vedono solo file tracciati
     git diff --cached | head -40    # gli UUID sono lì? bene
 
 **4. Il primo switch** (i flake vanno abilitati a mano solo questa volta:
 da qui in poi li abilita la config stessa):
 
-    sudo nixos-rebuild switch --flake ~/nixos-config#portatilino \
+    sudo nixos-rebuild switch --flake ~/nixos-config#armoredcoreVIP \
       --option experimental-features "nix-command flakes"
     reboot     # SDDM → niri → DMS
 
-**5. Dopo:** `git commit -am "portatilino: hardware-configuration vero" && git push`,
+**5. Dopo:** `git commit -am "armoredcoreVIP: hardware-configuration vero" && git push`,
 poi i punti 4-7 di "Post primo boot". `/etc/nixos/configuration.nix`
 dell'installer non serve più: il flake lo ignora, puoi cancellarlo.
 
@@ -375,12 +375,12 @@ dell'installer non serve più: il flake lo ignora, puoi cancellarlo.
 
    Finché non lo fai, `~/.config/nvim` è un link rotto e nvim parte
    nudo, senza LazyVim (successo: 2026-09-05).
-3. `cd ~/nixos-config && git commit -am "portatilino: hardware-configuration vero" && git push`
-   (fatto per portatilino il 2026-09-05: il suo hardware-config vero è nel repo)
+3. `cd ~/nixos-config && git commit -am "armoredcoreVIP: hardware-configuration vero" && git push`
+   (fatto per armoredcoreVIP il 2026-09-05: il suo hardware-config vero è nel repo)
 4. `nix-index` (una volta: il DB per "comando non trovato → pacchetto")
 5. apri `nvim`: lazy.nvim scarica i plugin da `dotfiles/nvim/lazy-lock.json`
 6. `mullvad account login` / login Steam / `docker run hello-world`
-7. da qui in poi: modifica → `sudo nixos-rebuild switch --flake ~/nixos-config#portatilino`
+7. da qui in poi: modifica → `sudo nixos-rebuild switch --flake ~/nixos-config#armoredcoreVIP`
 
 Note:
 - `dms setup` NON serve: config.kdl non usa gli include DMS (come su Arch)

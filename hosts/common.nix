@@ -1,5 +1,6 @@
 # ╔════════════════════════════════════════════════════════════════════╗
-# ║  Tutto ciò che è UGUALE su portatilino e fisso.                    ║
+# ║  Tutto ciò che è UGUALE su armoredcoreVIP (portatile) e             ║
+# ║  armoredcoreVIF (fisso).                                           ║
 # ║  Le differenze (CPU, GPU, batteria) stanno in hosts/<nome>/.       ║
 # ╚════════════════════════════════════════════════════════════════════╝
 { config, pkgs, ... }:

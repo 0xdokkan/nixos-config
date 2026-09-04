@@ -1,5 +1,5 @@
 # ╔════════════════════════════════════════════════════════════════════╗
-# ║  portatilino — ThinkPad T470s: Intel Kaby Lake, HD 620, batteria   ║
+# ║  armoredcoreVIP — ThinkPad T470s: Intel Kaby Lake, HD 620, batteria   ║
 # ║  Tutto il resto (desktop, audio, app, utente...) è in ../common.nix║
 # ╚════════════════════════════════════════════════════════════════════╝
 { config, pkgs, ... }:
@@ -10,7 +10,7 @@
     ../common.nix
   ];
 
-  networking.hostName = "portatilino";
+  networking.hostName = "armoredcoreVIP";
 
   # ══ Tastiera italiana ═══════════════════════════════════════════════
   # Unica fonte di verità per il layout: la leggono SDDM, la console
@@ -26,7 +26,7 @@
     intel-media-driver   # VAAPI (decodifica video hw) per Gen9.5/Kaby Lake
   ];
   # config.kdl è condiviso e già ripulito dalle env var nvidia: sul fisso
-  # quelle variabili le mette hosts/fisso/configuration.nix a livello di
+  # quelle variabili le mette hosts/armoredcoreVIF/configuration.nix a livello di
   # sessione, così il file niri resta uno solo ✓
 
   # ══ Termiche e batteria ═════════════════════════════════════════════

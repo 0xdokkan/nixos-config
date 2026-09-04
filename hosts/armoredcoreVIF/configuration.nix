@@ -1,5 +1,5 @@
 # ╔════════════════════════════════════════════════════════════════════╗
-# ║  fisso — desktop: i7-9700K, GeForce RTX 2070 (nvidia-open)         ║
+# ║  armoredcoreVIF — il fisso: i7-9700K, GeForce RTX 2070 (nvidia-open)║
 # ║  Tutto il resto (desktop, audio, app, utente...) è in ../common.nix║
 # ╚════════════════════════════════════════════════════════════════════╝
 { config, pkgs, ... }:
@@ -10,10 +10,10 @@
     ../common.nix
   ];
 
-  networking.hostName = "fisso";
+  networking.hostName = "armoredcoreVIF";
 
   # Tastiera: US, cioè il default di services.xserver.xkb.layout.
-  # (il portatile invece dichiara "it" — vedi hosts/portatilino)
+  # (il portatile invece dichiara "it" — vedi hosts/armoredcoreVIP)
 
   # ══ CPU ═════════════════════════════════════════════════════════════
   hardware.cpu.intel.updateMicrocode = true;   # Coffee Lake, i7-9700K
