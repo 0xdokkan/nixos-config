@@ -278,6 +278,45 @@ chiedi prima di formattare.)
 Sul **fisso** è identico con `#fisso`, ma occhio: lì Arch vive su
 `/dev/sdb`. Usa un altro disco, oppure chiedi per un dual-boot fatto bene.
 
+## Installazione, variante B: prima NixOS "vanilla", poi il flake
+
+Se preferisci l'installer classico (anche quello grafico con Calamares):
+funziona, e il repo finisce direttamente in `~/nixos-config` col
+proprietario giusto. Ma c'è UN passo che non si può saltare.
+
+**1. Installa NixOS normale** dalla ISO. Nell'installer scegli:
+- utente **`dokkan`** (così coincide con la config; la password che metti
+  lì resta, `initialPassword` vale solo se l'utente lo crea il flake)
+- desktop: **nessuno** (sarà niri; un GNOME/Plasma scelto qui verrebbe
+  comunque tolto al primo switch, è solo tempo perso)
+- bootloader: systemd-boot, UEFI
+
+**2. Primo boot, terminale.** git e i flake non ci sono ancora:
+
+    nix-shell -p git
+    git clone https://github.com/0xdokkan/nixos-config ~/nixos-config
+    cd ~/nixos-config
+
+**3. IL passo: l'hardware-configuration vero nel repo.** Il segnaposto del
+repo cerca un disco con label `nixos`, che l'installer classico NON mette
+(usa gli UUID). Senza questa copia il rebuild riesce ma la nuova
+generazione al boot non trova la root.
+
+    cp /etc/nixos/hardware-configuration.nix hosts/portatilino/
+    git add hosts/portatilino/hardware-configuration.nix     # i flake vedono solo file tracciati
+    git diff --cached | head -40    # gli UUID sono lì? bene
+
+**4. Il primo switch** (i flake vanno abilitati a mano solo questa volta:
+da qui in poi li abilita la config stessa):
+
+    sudo nixos-rebuild switch --flake ~/nixos-config#portatilino \
+      --option experimental-features "nix-command flakes"
+    reboot     # SDDM → niri → DMS
+
+**5. Dopo:** `git commit -am "portatilino: hardware-configuration vero" && git push`,
+poi i punti 4-7 di "Post primo boot". `/etc/nixos/configuration.nix`
+dell'installer non serve più: il flake lo ignora, puoi cancellarlo.
+
 ## Post primo boot
 
 1. login `dokkan` / `cambiami`, poi subito `passwd`
