@@ -25,7 +25,7 @@ let
       FormPosition = "left";
       BackgroundColor = "#444";
       RoundCorners = "20";
-      Font = "Noto Sans";
+      Font = "Monaspace Argon";
       HourFormat = "hh:mm A";
       DateFormat = "dddd, d of MMMM";
       HeaderText = "码农万岁";
@@ -39,6 +39,10 @@ in
   # ══ Nix stesso ══════════════════════════════════════════════════════
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
   nixpkgs.config.allowUnfree = true;   # discord, steam, obsidian, claude-code, nvidia...
+  # Cache pubblicata da Numtide per llm-agents: evita di compilare Codex.
+  # È una fonte di binari fidata aggiuntiva, con verifica della firma.
+  nix.settings.extra-substituters = [ "https://cache.numtide.com" ];
+  nix.settings.extra-trusted-public-keys = [ "niks3.numtide.com-1:DTx8wZduET09hRmMtKdQDxNNthLQETkc/yaX7M4qK0g=" ];
 
   # ══ Pulizia automatica dello store ══════════════════════════════════
   # Ogni rebuild lascia la generazione precedente (è il rollback). Senza
@@ -150,7 +154,19 @@ in
   # Le app Electron (discord, obsidian, webcord...) in wayland nativo.
   # Sostituisce i vari ~/.config/*-flags.conf di Arch. Lo legge anche il
   # wrapper di helium.
-  environment.sessionVariables.NIXOS_OZONE_WL = "1";
+  # niri-session importa l'ambiente prima di avviare i servizi utente:
+  # queste variabili arrivano anche a DMS e alle app aperte dal launcher.
+  environment.sessionVariables = {
+    NIXOS_OZONE_WL = "1";
+    QT_QPA_PLATFORM = "wayland;xcb";
+    # Come qt.platformTheme.name = "qtct" in home/desktop.nix:
+    # qt5ct è anche l'alias riconosciuto dal plugin Qt6 di qt6ct.
+    QT_QPA_PLATFORMTHEME = "qt5ct";
+    QT_WAYLAND_DISABLE_WINDOWDECORATION = "1";
+    QT_AUTO_SCREEN_SCALE_FACTOR = "1";
+    MOZ_ENABLE_WAYLAND = "1";
+    GDK_SCALE = "1";
+  };
 
   environment.systemPackages = with pkgs; [
     xwayland-satellite   # X11 apps dentro niri
@@ -208,17 +224,20 @@ in
 
   # ══ Font ════════════════════════════════════════════════════════════
   fonts.packages = with pkgs; [
-    monaspace                    # kitty: Monaspace Argon
+    monaspace                    # Monaspace Argon: desktop, login e kitty
     nerd-fonts.jetbrains-mono    # era ttf-jetbrains-mono-nerd (solo il font!)
     nerd-fonts.symbols-only      # era ttf-nerd-fonts-symbols: p10k è in
                                  # modalità nerdfont-complete e Monaspace
                                  # non ha i glifi → fallback via fontconfig
     noto-fonts-color-emoji       # ttf-apple-emoji non è in nixpkgs
                                  # (licenza Apple), questo è lo standard
-    noto-fonts                   # "Noto Sans": il font del login (Candy lo
-                                 # usava) e un sans decente per tutto il resto
+    noto-fonts                   # fallback per i caratteri mancanti
   ];
-  fonts.fontconfig.defaultFonts.emoji = [ "Noto Color Emoji" ];
+  fonts.fontconfig.defaultFonts = {
+    sansSerif = [ "Monaspace Argon" "Noto Sans" ];
+    monospace = [ "Monaspace Argon" "Symbols Nerd Font Mono" ];
+    emoji = [ "Noto Color Emoji" ];
+  };
 
   # ══ Rimandati di proposito ══════════════════════════════════════════
   # services.flatpak.enable = true;   # su Arch c'era, ma quasi tutto è in nixpkgs

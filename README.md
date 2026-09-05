@@ -5,7 +5,7 @@ no guilt, just restart.
 
 ## Struttura
 
-    flake.nix                  ← input (nixpkgs, home-manager, helium), host, devshell, template
+    flake.nix                  ← input (nixpkgs, home-manager, helium, llm-agents), host, devshell, template
     hosts/
       common.nix               ← tutto ciò che è uguale sui due pc: niri+DMS+SDDM, pipewire,
                                   utente, steam, docker, libvirt, mullvad, wireshark, font...
@@ -72,12 +72,44 @@ rotto qualcosa scegli quella prima e sei a posto. Da terminale:
     sudo nix-env --list-generations -p /nix/var/nix/profiles/system # storico
 
 **Aggiornare.** Il `flake.lock` inchioda la versione ESATTA di nixpkgs,
-home-manager e helium: due rebuild con lo stesso lock danno lo stesso
+home-manager, helium e llm-agents: due rebuild con lo stesso lock danno lo stesso
 sistema. Per aggiornare tutto (`pacman -Syu`) si sposta il lock:
 
     nix flake update          # scarica le versioni nuove nel lock
     sudo nixos-rebuild switch --flake ~/nixos-config#armoredcoreVIP
     git commit -am "bump"     # il lock è versionato: rollback anche dell'update
+
+**Aggiornare solo le app AI.** Claude Code, Codex CLI, Claude Desktop e
+ChatGPT/Codex desktop arrivano da
+[numtide/llm-agents.nix](https://github.com/numtide/llm-agents.nix), con
+packaging aggiornato giornalmente. Seguono le release pubblicate, non
+build dal ramo di sviluppo; può esserci un ritardo rispetto a upstream.
+OpenCode resta nel nixpkgs del sistema, come prima.
+
+    cd ~/nixos-config
+    nix flake update llm-agents
+    sudo nixos-rebuild switch --flake .#armoredcoreVIP
+
+Sul fisso usa `#armoredcoreVIF`. Il rebuild da solo NON cerca nuove
+versioni: usa quelle fissate nel lock. Questo input conserva il proprio
+nixpkgs testato da Numtide (senza `follows`), per aggiornarsi senza muovere
+il nixpkgs del sistema e mantenere compatibilità con i binari in cache.
+
+La cache firmata `https://cache.numtide.com` è abilitata in `flake.nix`
+e `hosts/common.nix`: significa fidarsi dei binari pubblicati da Numtide.
+Al primo rebuild accetta le impostazioni della cache quando Nix le chiede;
+in un terminale non interattivo aggiungi `--option accept-flake-config true`
+al comando di rebuild. Senza cache Nix può compilare Codex da sorgente,
+operazione costosa soprattutto sul portatile.
+
+Le CLI si avviano con `claude` e `codex`; le app con `claude-desktop` e
+`chatgpt`, oppure dal launcher. Il packaging Nix è comunitario, i payload
+desktop sono quelli ufficiali Linux: [Claude è ancora in beta](https://support.claude.com/en/articles/10065433-install-claude-desktop)
+e [ChatGPT/Codex in preview](https://learn.chatgpt.com/docs/linux/linux-app).
+NixOS non è una distribuzione ufficialmente supportata dalle due app.
+ChatGPT è configurato per XWayland: il supporto Wayland nativo è ancora
+sperimentale. Le app hanno runtime scaricati e dati aggiornati a runtime:
+il lock fissa i pacchetti, non ogni componente scaricato dall'app.
 
 **Cercare un pacchetto.** https://search.nixos.org (pacchetti E opzioni),
 oppure `nix search nixpkgs firefox`. Per sapere in che pacchetto sta un
@@ -107,6 +139,89 @@ puntano DENTRO `~/nixos-config/dotfiles/`: `~/.config/nvim` (lazy.nvim
 scrive il lockfile) e `~/.config/DankMaterialShell` (la UI di DMS scrive
 settings.json). Lì le modifiche le fai dal programma, e poi le committi:
 `git status` in `~/nixos-config` te le mostra.
+
+**DMS: blocco e risparmio energetico.** In `dotfiles/dms/settings.json`
+il blocco prima della sospensione è attivo. I timeout sono in secondi,
+misurati dall'ultima attività:
+
+| profilo | blocco schermo | spegnimento schermo | sospensione |
+|---------|----------------|---------------------|-------------|
+| batteria | 5 minuti | 6 minuti | 20 minuti |
+| alimentazione | 15 minuti | 20 minuti | disattivata |
+
+La configurazione è condivisa: il profilo alimentazione vale anche sul
+fisso. Puoi cambiare i tempi dalla UI di DMS e committare `settings.json`.
+Il comportamento sul portatile va verificato anche chiudendo il coperchio:
+alla riapertura la sessione deve richiedere lo sblocco.
+
+**DMS: batteria del portatile.** `services.upower.enable = true` è in
+`hosts/armoredcoreVIP/configuration.nix`: UPower espone le batterie a DMS.
+`power-profiles-daemon` gestisce i profili e non lo sostituisce; il widget
+batteria è già incluso nella barra. Dopo il rebuild, se non compare:
+
+    systemctl status upower
+    upower -d
+    systemctl --user restart dms
+
+Se UPower non elenca batterie, controlla `ls /sys/class/power_supply` e
+`journalctl -b -u upower`: il problema è a monte del widget. La verifica
+hardware va fatta sul portatile, non sul fisso usato per valutare il flake.
+
+**Claude Code e Codex: lavoro a schermo bloccato.** I comandi `claude`
+e `codex` installati da Home Manager impediscono la sospensione con
+`systemd-inhibit --what=sleep --mode=block`. Si usano normalmente:
+
+    claude
+    codex
+
+Blocco automatico e spegnimento dello schermo restano attivi. La protezione
+dura finché la CLI resta aperta, anche in attesa di un prompt, e viene
+rilasciata alla sua uscita. Ogni istanza ha il proprio inibitore: chiuderne
+una non rimuove quelli delle altre. Vale anche per i sottocomandi, come
+`codex exec`, per la durata del processo. Puoi controllarli con:
+
+    systemd-inhibit --list
+
+I wrapper sono in `home/dev.nix` e chiamano i binari originali nello store,
+conservandone argomenti, completamenti e risorse. Un avvio diretto del
+binario originale o da un'altra installazione bypassa questa protezione.
+La chiusura del coperchio conserva il comportamento di logind: per lasciare
+un lavoro in corso tienilo aperto. Anche una sospensione manuale ordinaria
+può essere bloccata finché una CLI è aperta; termina le CLI prima di sospendere.
+Questi wrapper proteggono le CLI nel PATH, NON automaticamente le sessioni
+avviate dalle app desktop, che possono usare un proprio runtime incluso.
+
+**DMS: clipboard e luce notturna.** La cronologia è quella nativa di DMS
+(`Mod+V`), senza watcher `cliphist` aggiuntivi. `wl-copy` e `wl-paste`
+restano disponibili per Neovim e il terminale. `Alt+F8` abilita la luce
+notturna di DMS, `Alt+F9` la disabilita; temperatura e programmazione si
+regolano dalla UI di DMS e restano nello stato della singola macchina.
+
+Dopo il rebuild, esci dalla sessione e rientra per applicare l'ambiente
+aggiornato e terminare i vecchi watcher clipboard e `wl-gammarelay`.
+I portali sono avviati dalla sessione senza restart manuali; controlla
+condivisione schermo e selettore file dopo il nuovo login.
+
+**Font: Monaspace Argon.** `pkgs.monaspace` è già installato a sistema.
+Il nome della famiglia per GTK, Qt, DMS e SDDM è `Monaspace Argon`;
+`MonaspaceArgon-Regular` è invece il nome PostScript usato da Kitty.
+La configurazione imposta:
+
+- `hosts/common.nix`: default fontconfig sans-serif/monospace e login SDDM;
+- `home/desktop.nix`: GTK e font monospace dconf a 10 pt, Qt5/Qt6 a 10 pt;
+- `dotfiles/dms/settings.json`: font UI e monospace della shell, peso 400;
+- Kitty: conserva il font Regular e la dimensione 9 già scelti.
+
+Qt è gestito da Home Manager con i plugin qt5ct/qt6ct; i due file INI
+sono read-only, quindi cambia i font in `home/desktop.nix`, non dalle loro
+GUI. Lascia `qtThemingEnabled=false` in DMS per non avere due gestori sugli
+stessi file. Dopo il rebuild esci e rientra, e riapri le app. Per verificare:
+
+    fc-match sans-serif
+    fc-match monospace
+
+I fallback Noto/emoji/simboli restano disponibili; siti e app che impongono
+un proprio font possono continuare a usarlo.
 
 **Pacchetti non liberi.** `allowUnfree = true` in `common.nix` sblocca
 discord, steam, obsidian, nvidia, claude-code. Senza, nix rifiuta di
@@ -204,6 +319,14 @@ Per aggiungere una libreria: `shell.nix` del progetto, riga nella lista,
 `direnv reload`. Per provare due righe senza progetto:
 `nix develop ~/nixos-config#rust`.
 
+**Python e wheel binarie.** Per pacchetti fuori da nixpkgs puoi usare
+`uv venv --python python3` e poi `uv pip install X`. Le estensioni native
+possono richiedere altre librerie condivise: con Python di nixpkgs,
+`nix-ld` non le rende automaticamente disponibili. Il template Python
+mostra come dichiarare `LD_LIBRARY_PATH` nella sola devshell, aggiungendo
+le librerie effettivamente richieste dal progetto. Vedi la
+[FAQ di nix-ld](https://github.com/nix-community/nix-ld#my-pythonnodejsrubyinterpreter-libraries-do-not-find-the-libraries-configured-by-nix-ld).
+
 ## Checklist prima dell'install
 
 - [x] script niri, p10k, nvim, kitty, cava: dentro e linkati
@@ -223,7 +346,7 @@ Per aggiungere una libreria: `shell.nix` del progetto, riga nella lista,
 ## Comandi
 
     # da Arch (con nix installato): la config valuta? costruisce anche il
-    # check che fa `niri validate` sui due config.kdl
+    # check: niri validate, UPower e font GTK/Qt/DMS/fontconfig
     # NB: i flake vedono SOLO i file tracciati da git → `git add` prima
     nix flake check
 
@@ -431,8 +554,6 @@ Note:
   niente più copie di file, `config-gaming.kdl` non può andare fuori sync.
 - Il repo DEVE stare in `~/nixos-config`: la config nvim è un symlink
   live lì dentro (strategia B in `home/dev.nix`).
-- Agenti AI: le CLI (claude-code, codex, opencode) sono in nixpkgs, in
-  `home/dev.nix`. Claude Desktop per Linux (beta ufficiale, solo .deb) NON
-  è in nixpkgs: esiste `github:poeck/claude-desktop-nix-flake` (modulo
-  `programs.claude-desktop.enable`), sarebbe un quarto input. Un client
-  desktop di ChatGPT/Codex per Linux non esiste, né ufficiale né in nix.
+- Agenti AI: CLI e app desktop sono dichiarati in `home/dev.nix`.
+  Claude Code, Codex, Claude Desktop e ChatGPT/Codex desktop usano
+  `llm-agents`; OpenCode resta in nixpkgs. Vedi "Aggiornare solo le app AI".

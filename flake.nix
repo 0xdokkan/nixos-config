@@ -1,10 +1,18 @@
 {
   description = "Sistema NixOS di Dokkan — il rice come sorgente";
 
+  # Vale già al primo rebuild (previa accettazione della config del flake).
+  # La stessa cache è configurata nel sistema in hosts/common.nix.
+  nixConfig = {
+    extra-substituters = [ "https://cache.numtide.com" ];
+    extra-trusted-public-keys = [ "niks3.numtide.com-1:DTx8wZduET09hRmMtKdQDxNNthLQETkc/yaX7M4qK0g=" ];
+  };
+
   # ── Gli input: pochi e giustificati. Resisti all'input creep! ──
   #   nixpkgs + home-manager: la base.
   #   helium-flake: Helium non è in nixpkgs (upstream pubblica solo .deb),
   #                 questo flake lo estrae e lo patcha. Voluto. :3
+  #   llm-agents: ultime release delle CLI e app AI, aggiornabili da sole.
   #   (DMS è in nixpkgs da 26.05: niente input per lui ✓)
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
@@ -19,9 +27,13 @@
       url = "github:oxcl/nix-flake-helium-browser";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    # Niente follows: conserva il nixpkgs testato da Numtide e i cache hit,
+    # anche quando aggiorni solo questo input senza aggiornare il sistema.
+    llm-agents.url = "github:numtide/llm-agents.nix";
   };
 
-  outputs = { self, nixpkgs, home-manager, helium-flake, ... }:
+  outputs = { self, nixpkgs, home-manager, helium-flake, llm-agents, ... }:
     let
       system = "x86_64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
@@ -42,6 +54,7 @@
           {
             home-manager.useGlobalPkgs = true;
             home-manager.useUserPackages = true;
+            home-manager.extraSpecialArgs.aiPackages = llm-agents.packages.${system};
             home-manager.users.dokkan = import ./home;
             # moduli HM esterni, disponibili a tutti i file in home/
             home-manager.sharedModules = [
@@ -63,7 +76,49 @@
 
       # ── `nix flake check` COSTRUISCE questi: niri validate sui due config.kdl ──
       # (è la stessa derivazione che home/desktop.nix linka in ~/.config/niri)
-      checks.${system}.niri-config = import ./home/niri-configs.nix { inherit pkgs; };
+      checks.${system} = {
+        niri-config = import ./home/niri-configs.nix { inherit pkgs; };
+
+        # Verifica i font realmente risolti e i file generati, senza attivare
+        # la home o dipendere dai font della macchina che esegue il check.
+        desktop-settings =
+          let
+            laptop = self.nixosConfigurations.armoredcoreVIP.config;
+            home = laptop.home-manager.users.dokkan;
+            fontTestConfig = pkgs.writeText "monaspace-test.conf" ''
+              <?xml version="1.0"?>
+              <!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd">
+              <fontconfig>
+                <dir>${pkgs.monaspace}/share/fonts</dir>
+                <include>${laptop.environment.etc.fonts.source}/conf.d/52-nixos-default-fonts.conf</include>
+                <cachedir prefix="xdg">fontconfig</cachedir>
+              </fontconfig>
+            '';
+          in
+          assert laptop.services.upower.enable;
+          assert home.gtk.font.name == "Monaspace Argon";
+          assert home.qt.platformTheme.name == "qtct";
+          assert laptop.environment.sessionVariables.QT_QPA_PLATFORMTHEME == home.home.sessionVariables.QT_QPA_PLATFORMTHEME;
+          pkgs.runCommand "desktop-settings-checked" {
+            nativeBuildInputs = [ pkgs.fontconfig pkgs.jq pkgs.ripgrep ];
+            FONTCONFIG_FILE = fontTestConfig;
+          } ''
+            export XDG_CACHE_HOME="$TMPDIR/font-cache"
+            for family in sans-serif monospace; do
+              test "$(fc-match --format '%{family}' "$family")" = 'Monaspace Argon'
+            done
+            jq -e '.fontFamily == "Monaspace Argon" and .monoFontFamily == "Monaspace Argon" and .fontWeight == 400 and .qtThemingEnabled == false' \
+              ${./dotfiles/dms/settings.json}
+            for ini in ${home.xdg.configFile."qt5ct/qt5ct.conf".source} ${home.xdg.configFile."qt6ct/qt6ct.conf".source}; do
+              rg '^general\s*=\s*"Monaspace Argon,10"$' "$ini"
+              rg '^fixed\s*=\s*"Monaspace Argon,10"$' "$ini"
+            done
+            for ini in ${home.xdg.configFile."gtk-3.0/settings.ini".source} ${home.xdg.configFile."gtk-4.0/settings.ini".source}; do
+              rg '^gtk-font-name\s*=\s*Monaspace Argon 10$' "$ini"
+            done
+            touch "$out"
+          '';
+      };
 
       # ── Devshell "scratch": `nix develop ~/nixos-config#<nome>` da ovunque ──
       devShells.${system} = {

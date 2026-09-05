@@ -31,6 +31,9 @@
 
   # ══ Termiche e batteria ═════════════════════════════════════════════
   services.thermald.enable = true;
+  # DMS legge le batterie via UPower; power-profiles-daemon gestisce
+  # invece i profili energetici e NON sostituisce questo servizio.
+  services.upower.enable = true;
   # TLP: opzionale ma sui ThinkPad dà il meglio — incluse le soglie di
   # carica per la salute della batteria. Ricorda: TLP e
   # power-profiles-daemon (in common.nix) non convivono, scegline uno.

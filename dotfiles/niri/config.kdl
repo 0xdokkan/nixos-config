@@ -164,19 +164,11 @@ hotkey-overlay {
 // SPAWN AT STARTUP — equivalente di exec-once di hyprland
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-// === Tenuti perché servono a DMS / al Wayland session ===
-// Restart xdg-desktop-portal per screensharing — sostituisce resetxdgportal.sh
-spawn-at-startup "sh" "-c" "systemctl --user restart xdg-desktop-portal xdg-desktop-portal-gtk"
-spawn-at-startup "sh" "-c" "dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP"
-spawn-at-startup "sh" "-c" "dbus-update-activation-environment --systemd --all"
-spawn-at-startup "sh" "-c" "systemctl --user import-environment WAYLAND_DISPLAY XDG_CURRENT_DESKTOP"
+// La sessione niri gestisce l'ambiente systemd/D-Bus e l'avvio dei portali.
+// Le variabili delle app sono in hosts/common.nix: nessun restart manuale.
 // udiskie: gestione media rimovibili (DMS non lo include)
 spawn-at-startup "udiskie" "--no-automount" "--smart-tray"
-// cliphist: DMS lo usa sotto, ma il watch va comunque avviato
-spawn-at-startup "sh" "-c" "wl-paste --type text --watch cliphist store"
-spawn-at-startup "sh" "-c" "wl-paste --type image --watch cliphist store"
-// wl-gammarelay: ancora usato per i bind Alt+F8/F9 (warm/cool 3000K)
-spawn-at-startup "wl-gammarelay"
+// DMS gestisce direttamente cronologia clipboard e filtro luce blu.
 
 // === Rimossi perché DMS li sostituisce ===
 //   waybar              → DMS bar
@@ -188,27 +180,20 @@ spawn-at-startup "wl-gammarelay"
 //   awww-daemon + restore → DMS wallpaper engine
 //
 // === DMS NON va in spawn-at-startup ===
-// Lo lanciamo via systemd: `systemctl --user add-wants niri.service dms`
-// così parte SOLO quando niri parte. Vedi MIGRATION_NOTES.
+// programs.dms-shell.systemd.enable in hosts/common.nix lo aggancia
+// a graphical-session.target.
 
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// ENVIRONMENT — variabili equivalenti agli `env =` di hyprland.conf
+// ENVIRONMENT — identità della sessione
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// NB: niri non espande variabili shell qui. Per il PATH aggiungi
-// ~/.local/share/bin nel tuo .zshrc/.bashrc o ~/.profile, NON qui:
-// settarlo wholesale qui sovrascriverebbe il resto del PATH.
+// Le variabili Qt/GTK/Firefox sono in hosts/common.nix per raggiungere
+// anche i servizi systemd e il launcher DMS. Il PATH utente è in home/shell.nix.
 
 environment {
     XDG_CURRENT_DESKTOP "niri"
     XDG_SESSION_TYPE "wayland"
     XDG_SESSION_DESKTOP "niri"
-    QT_QPA_PLATFORM "wayland;xcb"
-    QT_QPA_PLATFORMTHEME "qt6ct"
-    QT_WAYLAND_DISABLE_WINDOWDECORATION "1"
-    QT_AUTO_SCREEN_SCALE_FACTOR "1"
-    MOZ_ENABLE_WAYLAND "1"
-    GDK_SCALE "1"
     // (rimosse le env var nvidia: GBM_BACKEND, __GLX_VENDOR_LIBRARY_NAME,
     //  LIBVA_DRIVER_NAME, __GL_VRR_ALLOWED, NIRI_DISABLE_HARDWARE_CURSORS —
     //  il T470s è Intel HD 620, su iGPU non servono e alcune farebbero danni)
@@ -761,12 +746,12 @@ binds {
         spawn "dms" "ipc" "call" "brightness" "decrement" "5" ""
     }
 
-    // ───── Color temperature (gammarelay) ─────
-    Alt+F8 {
-        spawn "sh" "-c" "busctl --user -- call rs.wl-gammarelay / rs.wl.gammarelay UpdateTemperature n -3000"
+    // ───── Filtro luce blu (DMS; temperatura e orari dalla sua UI) ─────
+    Alt+F8 hotkey-overlay-title="Night mode on (DMS)" {
+        spawn "dms" "ipc" "call" "night" "enable"
     }
-    Alt+F9 {
-        spawn "sh" "-c" "busctl --user -- call rs.wl-gammarelay / rs.wl.gammarelay UpdateTemperature n +3000"
+    Alt+F9 hotkey-overlay-title="Night mode off (DMS)" {
+        spawn "dms" "ipc" "call" "night" "disable"
     }
 
     // ───── Movimento tra finestre/colonne (in stile hyprland mapping) ─────
@@ -924,7 +909,7 @@ binds {
     Mod+Shift+A hotkey-overlay-title="Spotlight" {
         spawn "dms" "ipc" "call" "spotlight" "toggle"
     }
-    // Clipboard manager DMS (usa cliphist sotto, UI propria)
+    // Clipboard manager DMS (cronologia nativa)
     Mod+V hotkey-overlay-title="Clipboard" {
         spawn "dms" "ipc" "call" "clipboard" "toggle"
     }

@@ -1,6 +1,13 @@
 { config, osConfig, pkgs, ... }:
 
 let
+  desktopFont = "Monaspace Argon";
+  # Qt richiede il valore QFont tra virgolette anche nel file INI.
+  qtFonts = {
+    general = ''"${desktopFont},10"'';
+    fixed = ''"${desktopFont},10"'';
+  };
+
   # ══ niri: config.kdl + config-gaming.kdl + host.kdl validati a BUILD-TIME ══
   # (la derivazione è in niri-configs.nix: la usa anche `checks` nel flake)
   # osConfig = la config NixOS dell'host: da lì arriva il layout tastiera.
@@ -39,11 +46,10 @@ in
     grim
     slurp
     swappy
-    # clipboard (spawn-at-startup usa wl-paste! è nel pacchetto wl-clipboard)
+    # wl-copy/wl-paste servono anche a nvim e agli script da terminale.
+    # La cronologia clipboard è gestita dal backend nativo di DMS.
     wl-clipboard
-    cliphist
-    # colore/luminosità/audio
-    wl-gammarelay-rs     # la riscrittura Rust: è quella con il bus rs.wl-gammarelay
+    # luminosità/audio (il filtro luce blu è gestito da DMS)
     brightnessctl
     pamixer
     pavucontrol
@@ -93,7 +99,7 @@ in
     kdePackages.ark
   ];
 
-  # ══ GTK: com'è sul fisso (icone Tela viola, Cantarell, tema Tokyo-Night) ══
+  # ══ GTK: icone Tela viola, Monaspace Argon, tema Tokyo-Night ════════
   # DMS fa il theming della SUA shell; per le app GTK (nautilus in testa)
   # il look del fisso viene da queste tre cose, che HM scrive in
   # gtk-3.0/settings.ini, gtk-4.0/settings.ini + gtk.css, e in dconf
@@ -117,11 +123,23 @@ in
       package = pkgs.tela-circle-icon-theme.override { colorVariants = [ "purple" ]; };
     };
     font = {
-      name = "Cantarell";
+      name = desktopFont;
       size = 10;
-      package = pkgs.cantarell-fonts;
+      package = pkgs.monaspace;
     };
     colorScheme = "dark";   # prefer-dark, com'è nel dconf del fisso
+  };
+
+  # GTK propaga già il font UI in dconf; questo copre il font monospace.
+  dconf.settings."org/gnome/desktop/interface".monospace-font-name = "${desktopFont} 10";
+
+  # Installa ENTRAMBI i plugin: la sola variabile QT_QPA_PLATFORMTHEME
+  # non basta. DMS ha qtThemingEnabled=false, quindi questi file sono di HM.
+  qt = {
+    enable = true;
+    platformTheme.name = "qtct";
+    qt5ctSettings.Fonts = qtFonts;
+    qt6ctSettings.Fonts = qtFonts;
   };
 
   # ══ Cursore: Bibata-Modern-Ice a 20px, com'era su Arch ══════════════

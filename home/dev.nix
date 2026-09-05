@@ -1,5 +1,28 @@
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, aiPackages, ... }:
 
+let
+  # Protegge l'intera sessione CLI, anche mentre aspetta un nuovo prompt.
+  # L'inibitore riguarda solo sleep: DMS continua a bloccare e spegnere
+  # lo schermo. systemd lo rilascia quando il comando termina.
+  keepAwake = package: command:
+    let
+      launcher = pkgs.writeShellScript command ''
+        exec ${pkgs.systemd}/bin/systemd-inhibit \
+          --what=sleep --mode=block --no-ask-password \
+          --who=${command} --why="Sessione ${command} aperta" \
+          -- ${lib.getExe' package command} "$@"
+      '';
+    in
+    pkgs.symlinkJoin {
+      name = "${package.pname}-keep-awake";
+      paths = [ package ];
+      # Conserva completamenti, risorse e binari ausiliari del pacchetto.
+      postBuild = ''
+        ln -sfn ${launcher} "$out/bin/${command}"
+      '';
+      inherit (package) meta;
+    };
+in
 {
   programs.git = {
     enable = true;
@@ -72,9 +95,14 @@
   home.file.".gdbinit".text = "source ${pkgs.gef}/share/gef/gef.py";
 
   home.packages = with pkgs; [
-    # ── agenti AI da terminale (i client desktop: vedi README) ──
-    claude-code   # Claude Code
-    codex         # OpenAI Codex CLI
+    # Release dal flake llm-agents, non dal nixpkgs del sistema.
+    # Il wrapper anti-sospensione resta valido anche dopo gli aggiornamenti.
+    (keepAwake aiPackages.claude-code "claude")
+    (keepAwake aiPackages.codex "codex")
+    aiPackages.claude-desktop
+    # La preview ufficiale usa XWayland: il supporto Wayland nativo è
+    # sperimentale. Questo flag prevale su quello aggiunto per NIXOS_OZONE_WL.
+    (aiPackages.chatgpt.override { commandLineArgs = "--ozone-platform=x11"; })
     opencode
     # ═══ DOTTRINA DEVSHELL ═══════════════════════════════════════════
     # NIENTE toolchain globali qui! go/rustup/jdk/python/meson/raylib/
