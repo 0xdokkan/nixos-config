@@ -156,6 +156,38 @@ Persa una macchina? Togli la sua riga, rebuild, e quella chiave è morta.
 
 `PermitRootLogin = "no"` lascialo: si entra come dokkan, poi `sudo`.
 
+## fastfetch: come si gestisce
+
+Tutto in `dotfiles/fastfetch/`: `config.jsonc` (layout e moduli) e
+`images/` (le immagini del logo). `home/shell.nix` genera la config vera
+sostituendo `@IMAGES@` con il percorso della cartella nello store.
+
+**Cambiare immagine.** Copia il file in `images/`, poi nel jsonc:
+
+    "source": "@IMAGES@/pikachu.png",     // il nome del TUO file
+    "width": 30, "height": 15,            // dimensioni in celle del terminale
+
+`git add` (i flake vedono solo file tracciati!), rebuild. Le immagini si
+vedono solo in kitty; in tty o via ssh fastfetch ripiega sul fiocco ASCII.
+
+**Tornare al logo ASCII.** Nel blocco `"logo"`: `"type": "builtin"` e
+togli `source`. Oppure `"source": "arch"` per ridere.
+
+**Moduli.** La lista `"modules"` è l'ordine delle righe. Nomi con
+`fastfetch --list-modules`; un modulo si configura come oggetto, es.
+`{ "type": "disk", "folders": "/" }`. Riferimento:
+https://github.com/fastfetch-cli/fastfetch/wiki/Configuration
+
+**Provare senza rebuild.** Il jsonc è JSON con commenti, fastfetch lo
+legge anche direttamente (ma con `@IMAGES@` non sostituito: usa un
+percorso assoluto per il test):
+
+    fastfetch --config ~/nixos-config/dotfiles/fastfetch/config.jsonc
+
+**All'apertura del terminale?** Oggi parte `pokemon-colorscripts`
+(dotfiles/zsh/extra.zsh). Per fastfetch al suo posto, o in aggiunta,
+cambia quella riga.
+
 ## Devshell: come si usa
 
 Il sistema NON ha compilatori. Ogni progetto ha la sua shell:

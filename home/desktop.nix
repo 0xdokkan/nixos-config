@@ -98,6 +98,7 @@ in
   # (~/.icons/default + XCURSOR_*), e Wayland (niri, che lo legge dalle
   # env var). Niente pacchetti tema oltre a questo: è funzionale, come le icone.
   home.pointerCursor = {
+    enable = true;   # HM recente lo vuole esplicito (altrimenti warning)
     name = "Bibata-Modern-Ice";
     package = pkgs.bibata-cursors;
     size = 20;
