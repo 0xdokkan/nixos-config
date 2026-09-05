@@ -30,7 +30,7 @@ no guilt, just restart.
       dms/                     ← impostazioni DMS (symlink live: la UI di DMS scrive qui,
                                   poi `git commit`; il tema tokyoNightStorm è dentro)
       cava/config              ← il gradiente
-      xdg/applications.menu    ← menu KDE per il "Apri con..." di Dolphin
+      fastfetch/               ← config.jsonc + images/ (le immagini del logo vanno qui)
     templates/{c,rust,zig,python}/
       shell.nix                ← LA devshell (usata anche da `nix develop ~/nixos-config#c`)
       flake.nix + .envrc       ← il boilerplate che il template copia nel progetto

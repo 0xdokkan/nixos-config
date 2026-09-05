@@ -51,7 +51,17 @@
     # gli alias li definisce extra.zsh (come su Arch), non HM
     enableZshIntegration = false;
   };
+  # fastfetch: config in dotfiles/fastfetch/config.jsonc, immagini in
+  # dotfiles/fastfetch/images/ (finiscono nello store: il placeholder
+  # @IMAGES@ nel jsonc viene sostituito col percorso vero a build-time).
+  # Per cambiare immagine: copia il file in images/, aggiorna "source" nel
+  # jsonc, rebuild. Le immagini vengono renderizzate solo in kitty (kitty
+  # graphics protocol); altrove fastfetch ripiega sul logo ASCII.
   programs.fastfetch.enable = true;
+  xdg.configFile."fastfetch/config.jsonc".source =
+    pkgs.replaceVars ../dotfiles/fastfetch/config.jsonc {
+      IMAGES = "${../dotfiles/fastfetch/images}";
+    };
   programs.yazi.enable = true;   # la zsh integration genera la funzione `y`
 
   # Il sostituto del command_not_found_handler basato su `pacman -F`:

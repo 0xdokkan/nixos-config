@@ -71,21 +71,17 @@ in
     cava
     # dev GUI (i toolchain restano nelle devshell)
     godot
-    # KDE: dolphin (Mod+E) + ark, e ciò che serve fuori da Plasma
-    kdePackages.dolphin
+    # file manager: quello di DMS (Mod+E). Dolphin e il suo seguito KDE
+    # sono stati tolti; resta solo ark per gli archivi.
     kdePackages.ark
-    kdePackages.kio-extras              # sftp, trash, thumbnail...
-    kdePackages.qtsvg                   # icone svg, altrimenti sono vuote
-    kdePackages.ffmpegthumbs            # anteprime video
-    kdePackages.kdegraphics-thumbnailers
   ];
 
   # ══ Icone: tema selezionato (NON theming estetico, quello lo fa DMS) ══
   # hicolor sopra copre le app che portano la propria icona. Restano i nomi
-  # generici che nessuna app fornisce ("system-file-manager" di Dolphin,
-  # "multimedia-volume-control" di pavucontrol) e le icone interne di
-  # Dolphin/Ark (toolbar, cartelle): serve un tema vero, selezionato.
-  # breeze è quello che le app KDE si aspettano. Lo legge DMS quando
+  # generici che nessuna app fornisce ("multimedia-volume-control" di
+  # pavucontrol, "media-optical" di udiskie) e le icone interne di Ark:
+  # serve un tema vero, selezionato. breeze è quello che le app KDE
+  # (ark, virt-manager via qt) si aspettano. Lo legge DMS quando
   # l'icon theme è "System Default", via dconf (programs.dconf a sistema ✓).
   # Vuoi il Tela-circle-purple di Arch? pkgs.tela-circle-icon-theme,
   # name "Tela-circle-purple".
@@ -161,7 +157,7 @@ in
   home.file."Pictures/Screenshots/.keep".text = "";
 
   # hyprlock: NON portato — il lock è DMS (Mod+L → dms ipc call lock lock).
-  # fastfetch: nessuna config custom su Arch → programs.fastfetch (shell.nix).
+  # fastfetch: dotfiles/fastfetch (config + immagini), wiring in shell.nix.
   # .gdbinit: in dev.nix 🚩
 
   # ══ XDG: cartelle utente e app di default (era ~/.config/mimeapps.list) ══

@@ -324,11 +324,6 @@ window-rule {
     opacity 0.80
     background-effect { blur true; }
 }
-window-rule {
-    match app-id="org.kde.dolphin"
-    opacity 0.80
-    background-effect { blur true; }
-}
 
 // --- Tool che vogliamo floating ---
 window-rule {
@@ -496,14 +491,6 @@ window-rule {
 }
 
 // --- Floating per titolo (modali/dialoghi) ---
-window-rule {
-    match app-id="org.kde.dolphin" title="^Progress Dialog — Dolphin$"
-    open-floating true
-}
-window-rule {
-    match app-id="org.kde.dolphin" title="^Copying — Dolphin$"
-    open-floating true
-}
 window-rule {
     match title="^About Mozilla Firefox$"
     open-floating true
@@ -686,7 +673,10 @@ binds {
 
     // ───── Application shortcuts ─────
     Mod+T { spawn "kitty"; }
-    Mod+E { spawn "dolphin"; }
+    // File manager: quello di DMS (era dolphin, rimosso)
+    Mod+E hotkey-overlay-title="Files (DMS)" {
+        spawn "dms" "ipc" "call" "widget" "openWith" "launcherButton" "files"
+    }
     // era `code`: ora l'editor è neovim dentro kitty
     Mod+C hotkey-overlay-title="Neovim" { spawn "kitty" "nvim"; }
     Mod+F { spawn "firefox"; }
@@ -705,9 +695,6 @@ binds {
     }
     Mod+Tab hotkey-overlay-title="Spotlight" {
         spawn "dms" "ipc" "call" "spotlight" "toggle"
-    }
-    Mod+Shift+E hotkey-overlay-title="Spotlight (files)" {
-        spawn "dms" "ipc" "call" "widget" "openWith" "launcherButton" "files"
     }
     // Notification center
     Mod+N hotkey-overlay-title="Notifications" {
