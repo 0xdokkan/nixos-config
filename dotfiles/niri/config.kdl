@@ -324,6 +324,11 @@ window-rule {
     opacity 0.80
     background-effect { blur true; }
 }
+window-rule {
+    match app-id="org.kde.dolphin"
+    opacity 0.80
+    background-effect { blur true; }
+}
 
 // --- Tool che vogliamo floating ---
 window-rule {
@@ -491,6 +496,14 @@ window-rule {
 }
 
 // --- Floating per titolo (modali/dialoghi) ---
+window-rule {
+    match app-id="org.kde.dolphin" title="^Progress Dialog — Dolphin$"
+    open-floating true
+}
+window-rule {
+    match app-id="org.kde.dolphin" title="^Copying — Dolphin$"
+    open-floating true
+}
 window-rule {
     match title="^About Mozilla Firefox$"
     open-floating true
@@ -673,8 +686,10 @@ binds {
 
     // ───── Application shortcuts ─────
     Mod+T { spawn "kitty"; }
-    // File manager: quello di DMS (era dolphin, rimosso)
-    Mod+E hotkey-overlay-title="Files (DMS)" {
+    // File manager: dolphin. (DMS non ne ha uno: il suo "files" è solo
+    // la ricerca file di Spotlight, ed è su Mod+Shift+E)
+    Mod+E { spawn "dolphin"; }
+    Mod+Shift+E hotkey-overlay-title="Spotlight (files)" {
         spawn "dms" "ipc" "call" "widget" "openWith" "launcherButton" "files"
     }
     // era `code`: ora l'editor è neovim dentro kitty

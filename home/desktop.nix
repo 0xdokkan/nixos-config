@@ -71,17 +71,22 @@ in
     cava
     # dev GUI (i toolchain restano nelle devshell)
     godot
-    # file manager: quello di DMS (Mod+E). Dolphin e il suo seguito KDE
-    # sono stati tolti; resta solo ark per gli archivi.
+    # KDE: dolphin (Mod+E) + ark, e ciò che serve fuori da Plasma.
+    # (DMS NON ha un file manager: il suo "files" è la ricerca di Spotlight)
+    kdePackages.dolphin
     kdePackages.ark
+    kdePackages.kio-extras              # sftp, trash, thumbnail...
+    kdePackages.qtsvg                   # icone svg, altrimenti sono vuote
+    kdePackages.ffmpegthumbs            # anteprime video
+    kdePackages.kdegraphics-thumbnailers
   ];
 
   # ══ Icone: tema selezionato (NON theming estetico, quello lo fa DMS) ══
   # hicolor sopra copre le app che portano la propria icona. Restano i nomi
-  # generici che nessuna app fornisce ("multimedia-volume-control" di
-  # pavucontrol, "media-optical" di udiskie) e le icone interne di Ark:
-  # serve un tema vero, selezionato. breeze è quello che le app KDE
-  # (ark, virt-manager via qt) si aspettano. Lo legge DMS quando
+  # generici che nessuna app fornisce ("system-file-manager" di Dolphin,
+  # "media-optical" di udiskie) e le icone interne di Dolphin/Ark
+  # (toolbar, cartelle): serve un tema vero, selezionato. breeze è quello
+  # che le app KDE si aspettano. Lo legge DMS quando
   # l'icon theme è "System Default", via dconf (programs.dconf a sistema ✓).
   # Vuoi il Tela-circle-purple di Arch? pkgs.tela-circle-icon-theme,
   # name "Tela-circle-purple".
@@ -187,6 +192,9 @@ in
       "x-scheme-handler/https"   = "librewolf.desktop";
       "x-scheme-handler/about"   = "librewolf.desktop";
       "x-scheme-handler/unknown" = "librewolf.desktop";
+      # cartelle → dolphin: lo usano DMS (defaultApp fileManager, "apri
+      # cartella" nelle notifiche/download) e xdg-open. Senza, si aprono in kitty.
+      "inode/directory"          = "org.kde.dolphin.desktop";
       # PDF e fumetti → helium, come su Arch
       "application/pdf"               = "helium.desktop";
       "application/x-ext-pdf"         = "helium.desktop";
