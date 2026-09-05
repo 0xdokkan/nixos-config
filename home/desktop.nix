@@ -93,6 +93,17 @@ in
     };
   };
 
+  # ══ Cursore: Bibata-Modern-Ice a 20px, com'era su Arch ══════════════
+  # Il modulo lo propaga ovunque in un colpo: GTK (settings.ini), Qt/X11
+  # (~/.icons/default + XCURSOR_*), e Wayland (niri, che lo legge dalle
+  # env var). Niente pacchetti tema oltre a questo: è funzionale, come le icone.
+  home.pointerCursor = {
+    name = "Bibata-Modern-Ice";
+    package = pkgs.bibata-cursors;
+    size = 20;
+    gtk.enable = true;
+  };
+
   # ══ DMS: le impostazioni (bar, widget, tema tokyoNightStorm, firefox.css) ══
   # Stessa strategia di nvim: symlink "live" dentro il repo. DMS ci SCRIVE
   # ogni volta che cambi qualcosa dalla sua UI, quindi non può stare nello
