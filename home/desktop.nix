@@ -8,6 +8,19 @@ let
     inherit pkgs;
     layout = osConfig.services.xserver.xkb.layout;
   };
+
+  # ══ Il tema GTK del fisso: "Tokyo-Night" di HyDE (= Tokyonight-Storm di ══
+  # ══ Fausto-Korpsvart), vendorizzato in dotfiles/gtk/ ═══════════════════
+  # nixpkgs ha rimosso tokyonight-gtk-theme (dipendeva da gtk-engine-murrine),
+  # quindi lo impacchettiamo noi: home-manager vuole un pacchetto con
+  # share/themes/<nome>/gtk-{3,4}.0 e per GTK4 (nautilus, libadwaita) lo
+  # importa da ~/.config/gtk-4.0/gtk.css; gli url('assets/…') relativi nel
+  # css si risolvono dentro il pacchetto. È ciò che rende Nautilus viola
+  # scuro sul fisso.
+  tokyoNightGtk = pkgs.runCommandLocal "tokyo-night-gtk-theme" { } ''
+    mkdir -p $out/share/themes/Tokyo-Night
+    cp -r ${../dotfiles/gtk/Tokyo-Night}/. $out/share/themes/Tokyo-Night/
+  '';
 in
 {
   xdg.configFile."niri/config.kdl".source        = "${niriConfigs}/config.kdl";
@@ -80,20 +93,35 @@ in
     kdePackages.ark
   ];
 
-  # ══ Icone: tema selezionato (NON theming estetico, quello lo fa DMS) ══
-  # hicolor sopra copre le app che portano la propria icona. Restano i nomi
-  # generici che nessuna app fornisce ("media-optical" di udiskie) e le
-  # icone interne di Ark: serve un tema vero, selezionato. breeze è quello
-  # che le app KDE si aspettano; nautilus porta le sue (adwaita). Lo legge DMS quando
-  # l'icon theme è "System Default", via dconf (programs.dconf a sistema ✓).
-  # Vuoi il Tela-circle-purple di Arch? pkgs.tela-circle-icon-theme,
-  # name "Tela-circle-purple".
+  # ══ GTK: com'è sul fisso (icone Tela viola, Cantarell, tema Tokyo-Night) ══
+  # DMS fa il theming della SUA shell; per le app GTK (nautilus in testa)
+  # il look del fisso viene da queste tre cose, che HM scrive in
+  # gtk-3.0/settings.ini, gtk-4.0/settings.ini + gtk.css, e in dconf
+  # (org/gnome/desktop/interface: le app GTK4 lo leggono via portale).
+  # hicolor (sopra) resta necessario: senza il suo index.theme nessuna
+  # icona per-app viene trovata, qualunque tema tu scelga.
   gtk = {
     enable = true;
-    iconTheme = {
-      name = "breeze";
-      package = pkgs.kdePackages.breeze-icons;
+    theme = {
+      name = "Tokyo-Night";
+      package = tokyoNightGtk;
     };
+    # con stateVersion ≥ 26.05 gtk4 NON eredita gtk.theme: va detto
+    gtk4.theme = {
+      name = "Tokyo-Night";
+      package = tokyoNightGtk;
+    };
+    iconTheme = {
+      name = "Tela-circle-purple";
+      # il pacchetto di default costruisce solo la variante blu
+      package = pkgs.tela-circle-icon-theme.override { colorVariants = [ "purple" ]; };
+    };
+    font = {
+      name = "Cantarell";
+      size = 10;
+      package = pkgs.cantarell-fonts;
+    };
+    colorScheme = "dark";   # prefer-dark, com'è nel dconf del fisso
   };
 
   # ══ Cursore: Bibata-Modern-Ice a 20px, com'era su Arch ══════════════

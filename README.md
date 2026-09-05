@@ -31,6 +31,8 @@ no guilt, just restart.
                                   poi `git commit`; il tema tokyoNightStorm è dentro)
       cava/config              ← il gradiente
       fastfetch/               ← config.jsonc + images/ (le immagini del logo vanno qui)
+      gtk/Tokyo-Night/         ← il tema GTK di HyDE (Tokyonight-Storm): nautilus & co.
+                                  come sul fisso. Vendorizzato: nixpkgs l'ha rimosso
     templates/{c,rust,zig,python}/
       shell.nix                ← LA devshell (usata anche da `nix develop ~/nixos-config#c`)
       flake.nix + .envrc       ← il boilerplate che il template copia nel progetto
