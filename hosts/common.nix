@@ -40,10 +40,28 @@ in
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
   nixpkgs.config.allowUnfree = true;   # discord, steam, obsidian, claude-code, nvidia...
 
+  # ══ Pulizia automatica dello store ══════════════════════════════════
+  # Ogni rebuild lascia la generazione precedente (è il rollback). Senza
+  # questo, /nix/store cresce per sempre. Ogni settimana: via le
+  # generazioni più vecchie di 14 giorni, poi gc di ciò che nessuno usa più.
+  # (La generazione ATTIVA e quelle recenti restano sempre.)
+  nix.gc = {
+    automatic = true;
+    dates = "weekly";
+    options = "--delete-older-than 14d";
+    persistent = true;   # se il pc era spento al momento giusto, lo fa al boot
+  };
+  # Deduplica i file identici nello store con hardlink: 20-30% di spazio
+  nix.settings.auto-optimise-store = true;
+  # Pulizia a mano, quando vuoi:
+  #   sudo nix-collect-garbage --delete-older-than 7d   (o -d = tutte tranne l'attiva)
+
   # ══ Boot ════════════════════════════════════════════════════════════
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
-  # boot.loader.systemd-boot.configurationLimit = 15; # quante generazioni tenere nel menu
+  # Nel menu di boot al massimo 10 generazioni: il file /boot è piccolo (1 GB)
+  # e ogni voce porta con sé kernel + initrd. La gc sopra fa il resto.
+  boot.loader.systemd-boot.configurationLimit = 10;
 
   # ══ Rete (l'hostName è per-host) ════════════════════════════════════
   networking.networkmanager.enable = true;

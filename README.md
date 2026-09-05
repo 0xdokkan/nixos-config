@@ -89,10 +89,14 @@ comando che manca: scrivilo e basta, `nix-index` te lo dice (come
     nix develop ~/nixos-config#rust   # una devshell "scratch" di questo repo
 
 **Pulizia.** Le generazioni vecchie e i pacchetti orfani restano nello
-store finché non li cancelli (è quello che rende possibile il rollback):
+store finché non li cancelli (è quello che rende possibile il rollback).
+È AUTOMATICA (`nix.gc` in `common.nix`): ogni settimana via le generazioni
+più vecchie di 14 giorni + gc; nel menu di boot al massimo 10 voci. A mano:
 
-    sudo nix-collect-garbage --delete-older-than 14d   # generazioni + gc
-    nix store gc                                       # solo orfani
+    sudo nix-collect-garbage --delete-older-than 7d    # generazioni + gc
+    sudo nix-collect-garbage -d                        # TUTTE tranne l'attiva
+    nix store gc                                       # solo orfani, niente generazioni
+    sudo nix-env --list-generations -p /nix/var/nix/profiles/system   # cosa c'è
 
 **Dotfiles.** home-manager NON copia i tuoi file in `~/.config`: ci mette
 symlink che puntano nello store, quindi sono read-only. Si modificano
