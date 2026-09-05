@@ -152,12 +152,6 @@ in
   # wrapper di helium.
   environment.sessionVariables.NIXOS_OZONE_WL = "1";
 
-  # Dolphin fuori da Plasma: senza un menu XDG il "Apri con..." è vuoto.
-  # È il plasma-applications.menu di KDE, vendorizzato per non tirarsi
-  # dentro tutto plasma-workspace (vedi wiki.nixos.org/wiki/Dolphin).
-  environment.etc."xdg/menus/applications.menu".source =
-    ../dotfiles/xdg/applications.menu;
-
   environment.systemPackages = with pkgs; [
     xwayland-satellite   # X11 apps dentro niri
     vim
