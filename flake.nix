@@ -81,16 +81,32 @@
         niri-regressions =
           let
             laptopNiri = import ./home/niri-configs.nix { inherit pkgs; layout = "it"; };
+            softwareCursorNiri = import ./home/niri-configs.nix {
+              inherit pkgs;
+              disableCursorPlane = true;
+            };
           in
           pkgs.runCommand "niri-regressions-checked" {
             nativeBuildInputs = [ pkgs.python3 ];
           } ''
             python ${./tests/niri-regressions.py} \
+              --dms-root ${pkgs.dms-shell}/share/quickshell/dms \
               ${self.checks.${system}.niri-config}/config.kdl \
-              ${laptopNiri}/config.kdl
+              ${laptopNiri}/config.kdl \
+              ${softwareCursorNiri}/config.kdl
+            python - ${self.checks.${system}.niri-config}/host.kdl \
+              ${laptopNiri}/host.kdl ${softwareCursorNiri}/host.kdl <<'PY'
+            import sys
+            from pathlib import Path
+            desktop, laptop, workaround = (Path(p).read_text() for p in sys.argv[1:])
+            assert "disable-cursor-plane" not in desktop
+            assert "disable-cursor-plane" not in laptop
+            assert "disable-cursor-plane" in workaround
+            PY
             touch "$out"
           '';
         niri-gamemode = import ./tests/gamemode.nix { inherit pkgs; };
+        lazyvim-nix = import ./tests/lazyvim-nix.nix { inherit pkgs; };
 
         # Verifica i font realmente risolti e i file generati, senza attivare
         # la home o dipendere dai font della macchina che esegue il check.

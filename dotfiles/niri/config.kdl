@@ -588,9 +588,8 @@ layer-rule {
 // Privacy: oscura questi layer negli screencast gestiti da niri.
 // Clipboard comprende modale, popout dalla barra e menu contestuale;
 // il QR Wi-Fi contiene le credenziali e va protetto come la password.
-// ATTENZIONE: il dialogo Polkit principale di DMS è una FloatingWindow,
-// NON un layer. Va identificato sul sistema e coperto con una window-rule;
-// il match Polkit sotto copre solo eventuali layer/superfici incorporati.
+// Il dialogo Polkit principale è una FloatingWindow: è coperto dalla
+// window-rule dedicata sotto, non dal match layer dms:polkit.
 layer-rule {
     match namespace="^dms:clipboard($|[-:].*)"
     match namespace="^dms:polkit($|[-:].*)"
@@ -610,6 +609,15 @@ layer-rule {
     match namespace="^dms:notification-center-modal$"
     match namespace="^dms:control-center$"
     place-within-backdrop true
+}
+
+// DMS shell.qml dichiara AppId com.danklinux.dms; PolkitAuthModal.qml usa
+// I18n.tr("Authentication") come titolo. Incrocia EN + tutte le traduzioni
+// del pacchetto bloccato, senza oscurare le altre finestre della shell.
+// tests/niri-regressions.py verifica questi identificativi contro DMS.
+window-rule {
+    match app-id=r#"^com\.danklinux\.dms$"# title=r#"^(Authentication|Autenticación|Autenticazione|Autenticação|Autentisering|Authenticatie|Authentification|Authentifizierung|Aŭtentigo|Hitelesítés|Kimlik Doğrulama|Uwierzytelnianie|Xác thực|Аутентификация|אימות|احراز هویت|المصادقة|認証|认证|驗證|인증)$"#
+    block-out-from "screencast"
 }
 
 // === Layer rule legacy (in caso rofi/dunst venissero comunque chiamati) ===

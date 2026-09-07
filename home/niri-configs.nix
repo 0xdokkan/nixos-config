@@ -1,7 +1,7 @@
 # ══ niri: config.kdl + config-gaming.kdl + host.kdl, validati a BUILD-TIME ══
 # Se una delle config è invalida il sistema si rifiuta di buildare. ✨
 #
-# È una funzione { pkgs, layout } → derivazione perché la usano in due:
+# È una funzione { pkgs, layout, disableCursorPlane } → derivazione:
 #   - home/desktop.nix  → la linka in ~/.config/niri/ (col layout dell'host)
 #   - flake.nix         → la espone in `checks`, così `nix flake check`
 #                         fa girare `niri validate` davvero (senza dover
@@ -11,10 +11,10 @@
 # a vicenda con path relativi:
 #   config-gaming.kdl → include "config.kdl" → include "host.kdl"
 #
-# host.kdl è l'UNICO pezzo di niri che cambia tra fisso e armoredcoreVIP:
-# il layout della tastiera (US sul fisso, IT sul portatile). Lo generiamo
-# qui dal valore che l'host dichiara in services.xserver.xkb.layout.
-{ pkgs, layout ? "us" }:
+# host.kdl contiene il layout dichiarato in services.xserver.xkb.layout
+# (US sul fisso, IT sul portatile) e l'eventuale workaround del cursore.
+# disableCursorPlane è opt-in: niente cursore software forzato per default.
+{ pkgs, layout ? "us", disableCursorPlane ? false }:
 
 pkgs.runCommand "niri-config-checked"
   { nativeBuildInputs = [ pkgs.niri ]; } ''
@@ -30,6 +30,11 @@ pkgs.runCommand "niri-config-checked"
           }
       }
   }
+  ${pkgs.lib.optionalString disableCursorPlane ''
+  debug {
+      disable-cursor-plane
+  }
+  ''}
   EOF
   niri validate --config $out/config.kdl
   niri validate --config $out/config-gaming.kdl

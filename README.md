@@ -16,7 +16,7 @@ no guilt, just restart.
     home/                      ← la home di dokkan, identica su entrambi
       default.nix              ← entry home-manager
       desktop.nix              ← niri (config + game mode validate a build-time), app, kitty, xdg
-      niri-configs.nix         ← la derivazione che fa `niri validate` (usata anche da `checks`)
+      niri-configs.nix         ← `niri validate`, layout per-host e workaround cursore opzionale
       shell.nix                ← zsh + p10k + alias + CLI belt
       dev.nix                  ← git/gh, direnv, neovim (LazyVim), agenti AI, .gdbinit
     dotfiles/
@@ -37,6 +37,7 @@ no guilt, just restart.
       shell.nix                ← LA devshell (usata anche da `nix develop ~/nixos-config#c`)
       flake.nix + .envrc       ← il boilerplate che il template copia nel progetto
     tests/                     ← regressioni privacy/scratch e toggle gaming, senza sessione grafica
+                                  integrazione LazyVim/Mason con comandi Nix simulati
 
 ## Come funziona Nix (per chi arriva da pacman)
 
@@ -141,6 +142,33 @@ scrive il lockfile) e `~/.config/DankMaterialShell` (la UI di DMS scrive
 settings.json). Lì le modifiche le fai dal programma, e poi le committi:
 `git status` in `~/nixos-config` te le mostra.
 
+**LazyVim, Mason e Nix.** `lazy.nvim` continua a scaricare e aggiornare i
+plugin al primo avvio e successivamente; il symlink live e `lazy-lock.json`
+restano invariati. Mason gestisce invece gli eseguibili esterni (LSP,
+formatter, ecc.): l'override in `dotfiles/nvim/lua/plugins/nix.lua` evita
+installazioni doppie quando il tool è già disponibile da Nix.
+
+Su NixOS, o in un ambiente con binari Nix nel `PATH`, i comandi di Nix
+hanno precedenza su quelli di Mason. Gli LSP già risolti nello store
+usano `mason = false`; per i formatter e gli altri tool viene filtrata
+la lista di auto-installazione soltanto dove c'è una sostituzione nota
+e disponibile. Per esempio, `lua-language-server`, `nil` e `stylua` sono
+già forniti dal wrapper Neovim di Home Manager. I tool mancanti restano
+gestiti da Mason: non è una configurazione senza download.
+
+I toolchain/LSP di progetto restano nelle devshell: entra con
+`nix develop` oppure attendi `direnv`, **poi avvia `nvim`**. Una devshell
+aperta altrove non cambia l'ambiente di un editor già avviato. Nessun
+pacchetto Mason preesistente viene cancellato. Su Arch senza un ambiente
+Nix l'override non si attiva e resta il comportamento normale di LazyVim.
+
+L'extra Java non aggiunge il jar Lombok di Mason quando `jdtls` viene da
+Nix: eventuale supporto Lombok va fornito dal pacchetto/devshell Java.
+Adapter come codelldb restano gestiti come prima, perché hanno bisogno
+anche delle proprie librerie, non soltanto di un eseguibile nel `PATH`.
+Riferimenti: [LSP in LazyVim](https://www.lazyvim.org/plugins/lsp) e
+[configurazione Mason](https://github.com/mason-org/mason.nvim#default-configuration).
+
 **DMS: blocco e risparmio energetico.** In `dotfiles/dms/settings.json`
 il blocco prima della sospensione è attivo. I timeout sono in secondi,
 misurati dall'ultima attività:
@@ -211,17 +239,27 @@ questi elementi sul tuo schermo e non sono una protezione universale
 contro qualsiasi metodo di cattura.
 
 Il dialogo principale di autenticazione Polkit di DMS è una finestra,
-non un layer: **non è ancora coperto**. Il match `dms:polkit…` protegge
-solo le eventuali superfici layer incorporate. Per completare la regola,
-sul portatile apri una richiesta di autenticazione senza digitare password
-e identifica `app_id` e `title` con:
+non un layer: ora ha una `window-rule` dedicata che incrocia l'app-id
+`com.danklinux.dms` con il titolo `Authentication` e le sue traduzioni
+(italiano: `Autenticazione`). Gli identificativi provengono da `shell.qml`
+e `Modals/PolkitAuthModal.qml` del pacchetto DMS bloccato nel flake;
+il [pragma AppId di Quickshell](https://quickshell.org/docs/v0.3.0/guide/advanced/#appid)
+imposta l'identificativo delle finestre. Non vengono oscurate tutte le
+finestre DMS: impostazioni e notepad restano fuori da questa regola.
+Il match layer `dms:polkit…` copre invece le superfici incorporate.
+
+`nix flake check` confronta app-id, titolo e traduzioni con il pacchetto
+DMS: se cambiano, il test richiede di rivedere la regola. Per confermare
+i valori sul portatile, apri una richiesta di autenticazione senza
+digitare password e controlla `app_id` e `title` con:
 
     niri msg --json windows
 
 Prima di condividere dati reali, verifica l'anteprima di una registrazione
 o condivisione di prova con una voce clipboard fittizia e un QR Wi-Fi di
-una rete di test. I test automatici controllano sintassi e match dei
-namespace, non il risultato visivo della cattura.
+una rete di test; controlla anche il dialogo di autenticazione, senza
+inserire password. I test automatici controllano sintassi e identificativi,
+non il risultato visivo della cattura.
 
 **Niri: workspace scratch.** Ora è dichiarato per nome e rimane disponibile
 anche vuoto; è un workspace normale, visibile nella barra e nell'overview,
@@ -240,6 +278,24 @@ Un lock serializza pressioni ravvicinate; se niri rifiuta il cambio, lo
 stato precedente viene conservato. Usa il bind dalla sessione niri: lo
 script richiede il suo ambiente. Caricare manualmente una config fuori
 dallo script non aggiorna lo stato del toggle.
+
+**Niri/NVIDIA: workaround cursore opzionale.** La vecchia variabile
+`NIRI_DISABLE_HARDWARE_CURSORS` è stata rimossa: non è un'opzione di niri.
+Il workaround corretto è il flag KDL
+[`debug { disable-cursor-plane; }`](https://github.com/niri-wm/niri/wiki/Configuration:-Debug-Options#disable-cursor-plane),
+che forza il cursore software. È **disattivato di default**: serve soltanto
+se sul fisso il cursore sparisce o presenta problemi con il driver.
+
+Per abilitarlo, in `home/desktop.nix` scommenta questo parametro di
+`niriConfigs`, poi fai il rebuild del fisso:
+
+    disableCursorPlane = osConfig.networking.hostName == "armoredcoreVIF";
+
+Il confronto esclude il portatile Intel. `home/niri-configs.nix` genera
+il flag in `host.kdl`, incluso sia dalla config normale sia dalla gaming;
+`nix flake check` valida anche la variante con workaround attivo. Per
+disabilitarlo, ricommenta la riga e fai rebuild. Esci e rientra nella
+sessione per applicare il cambio dell'ambiente e del flag di debug.
 
 **Font: Monaspace Argon.** `pkgs.monaspace` è già installato a sistema.
 Il nome della famiglia per GTK, Qt, DMS e SDDM è `Monaspace Argon`;
@@ -385,8 +441,9 @@ le librerie effettivamente richieste dal progetto. Vedi la
 ## Comandi
 
     # da Arch (con nix installato): valuta i due host e costruisce i check:
-    # niri validate (normale/gaming, layout us/it), privacy/scratch,
-    # toggle gaming con IPC simulato, UPower e font GTK/Qt/DMS/fontconfig
+    # niri validate (normale/gaming, layout us/it, workaround cursore),
+    # privacy/scratch + titoli Polkit DMS, toggle gaming con IPC simulato,
+    # LazyVim/Mason con comandi simulati, UPower e font GTK/Qt/DMS/fontconfig
     # NB: i flake vedono SOLO i file tracciati da git → `git add` prima
     nix flake check
 

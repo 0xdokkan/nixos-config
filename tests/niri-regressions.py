@@ -5,12 +5,40 @@ KDL. Failing to find a block is an error, so a format change cannot silently ski
 the privacy checks. No compositor or screencast is started.
 """
 
+import argparse
+import json
 import re
-import sys
 from pathlib import Path
 
 
-def check(path: Path) -> None:
+def polkit_identity(dms_root: Path | None) -> tuple[str, set[str]]:
+    app_id = "com.danklinux.dms"
+    titles = {"Authentication", "Autenticazione"}
+    if dms_root is None:
+        return app_id, titles
+
+    shell = (dms_root / "shell.qml").read_text()
+    assert re.search(rf"^//@ pragma AppId {re.escape(app_id)}$", shell, re.M), (
+        "DMS changed its app-id; review the Polkit privacy rule"
+    )
+    modal = (dms_root / "Modals/PolkitAuthModal.qml").read_text()
+    assert re.search(r'^\s*title: I18n\.tr\("Authentication"\)\s*$', modal, re.M), (
+        "DMS changed its Polkit window title; review the privacy rule"
+    )
+    translations = list((dms_root / "translations/poexports").glob("*.json"))
+    assert translations, "DMS translations not found; do not silently skip this check"
+    for translation in translations:
+        # I18n.tr checks the term's context first, then the other contexts.
+        # Cover every non-empty translation of this term, including fallbacks.
+        for context in json.loads(translation.read_text()).values():
+            translated = context.get("Authentication")
+            if translated:
+                assert isinstance(translated, str)
+                titles.add(translated)
+    return app_id, titles
+
+
+def check(path: Path, app_id: str, titles: set[str]) -> None:
     text = re.sub(r"(?m)^\s*//[^\n]*", "", path.read_text())
     rules = re.findall(r"(?ms)^layer-rule\s*\{\n(.*?)^\}", text)
     privacy_patterns = [
@@ -41,6 +69,29 @@ def check(path: Path) -> None:
             f"{path}: unrelated layer {namespace} is unexpectedly hidden"
         )
 
+    window_patterns = []
+    for rule in re.findall(r"(?ms)^window-rule\s*\{\n(.*?)^\}", text):
+        if not re.search(r'^\s*block-out-from "screencast"\s*$', rule, re.M):
+            continue
+        matches = re.findall(
+            r'^\s*match app-id=r#"([^"]+)"# title=r#"([^"]+)"#\s*$', rule, re.M
+        )
+        assert matches, f"{path}: privacy window rule must constrain app-id AND title"
+        assert len(matches) == len(re.findall(r"^\s*match\b", rule, re.M)), (
+            f"{path}: untested match in privacy window rule"
+        )
+        window_patterns.extend((re.compile(app), re.compile(title)) for app, title in matches)
+
+    def protected(app: str, title: str) -> bool:
+        return any(a.search(app) and t.search(title) for a, t in window_patterns)
+
+    for title in titles:
+        assert protected(app_id, title), f"{path}: Polkit title {title!r} is not protected"
+        for unrelated in ("firefox", "comXdanklinuxXdms", "com.danklinux.dms.extra"):
+            assert not protected(unrelated, title), f"{path}: privacy app-id is too broad"
+    for title in ("Settings", "Notepad", "Authentication settings", "", "My Authentication"):
+        assert not protected(app_id, title), f"{path}: unrelated DMS window is hidden"
+
     assert len(re.findall(r'^workspace "scratch"\s*$', text, re.M)) == 1
     bindings = {
         key: body
@@ -50,11 +101,14 @@ def check(path: Path) -> None:
     assert 'focus-workspace "scratch"' in bindings["Mod+Ctrl+S"]
     assert "toggle-overview" in bindings["Mod+S"]
     assert not re.search(r"move-column-to-workspace\s+99\b", text)
-    print(f"{path}: privacy and scratch checks passed")
+    print(f"{path}: privacy ({len(titles)} Polkit titles) and scratch checks passed")
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        raise SystemExit("usage: niri-regressions.py CONFIG...")
-    for argument in sys.argv[1:]:
-        check(Path(argument))
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--dms-root", type=Path)
+    parser.add_argument("configs", type=Path, nargs="+")
+    args = parser.parse_args()
+    app_id, titles = polkit_identity(args.dms_root)
+    for path in args.configs:
+        check(path, app_id, titles)

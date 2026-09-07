@@ -49,9 +49,12 @@
     __GLX_VENDOR_LIBRARY_NAME = "nvidia";
     LIBVA_DRIVER_NAME = "nvidia";
     __GL_VRR_ALLOWED = "1";
-    # cursore software: con nvidia il cursore hardware a volte sparisce/lagga
-    NIRI_DISABLE_HARDWARE_CURSORS = "1";
   };
+
+  # NIRI_DISABLE_HARDWARE_CURSORS non è un'opzione di niri.
+  # Se il cursore dà problemi, abilita il workaround KDL disable-cursor-plane
+  # SOLO per questo host: vedi il parametro commentato in home/desktop.nix.
+  # Di default resta disabilitato: non tutti i sistemi NVIDIA ne hanno bisogno.
 
   # ══ NON TOCCARE MAI ═════════════════════════════════════════════════
   # Marcatore di compatibilità per i dati stateful, NON una versione da

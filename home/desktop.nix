@@ -14,6 +14,9 @@ let
   niriConfigs = import ./niri-configs.nix {
     inherit pkgs;
     layout = osConfig.services.xserver.xkb.layout;
+    # Workaround opzionale per bug del cursore NVIDIA: scommenta SOLO se
+    # necessario. Il confronto evita di applicarlo al portatile Intel.
+    # disableCursorPlane = osConfig.networking.hostName == "armoredcoreVIF";
   };
 
   # ══ Il tema GTK del fisso: "Tokyo-Night" di HyDE (= Tokyonight-Storm di ══
