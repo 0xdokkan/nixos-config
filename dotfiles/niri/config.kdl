@@ -5,7 +5,7 @@
 // ║                                                                      ║
 // ║  Note importanti:                                                    ║
 // ║   - In niri i workspace sono VERTICALI e dinamici. I bind Super+1..0 ║
-// ║     usano `focus-workspace N` che crea/raggiunge il workspace N.     ║
+// ║     usano `focus-workspace N` per raggiungere i workspace esistenti. ║
 // ║   - Le finestre nel workspace si organizzano in COLONNE che          ║
 // ║     scrollano orizzontalmente. Dentro una colonna ci possono essere  ║
 // ║     più finestre impilate verticalmente.                             ║
@@ -20,6 +20,11 @@
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 include "host.kdl"
+
+// Un workspace nominato resta disponibile anche quando è vuoto.
+// È visibile nella barra/overview: NON è uno "special" nascosto di Hyprland.
+// Gli altri workspace restano dinamici; i loro indici possono cambiare.
+workspace "scratch"
 
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -580,12 +585,17 @@ layer-rule {
         color "#00000064"
     }
 }
-// Privacy: blocca le superfici sensibili dagli screencast
-// (se condividi schermo o registri, password e clipboard non finiscono nel video)
+// Privacy: oscura questi layer negli screencast gestiti da niri.
+// Clipboard comprende modale, popout dalla barra e menu contestuale;
+// il QR Wi-Fi contiene le credenziali e va protetto come la password.
+// ATTENZIONE: il dialogo Polkit principale di DMS è una FloatingWindow,
+// NON un layer. Va identificato sul sistema e coperto con una window-rule;
+// il match Polkit sotto copre solo eventuali layer/superfici incorporati.
 layer-rule {
-    match namespace="^dms:clipboard$"
-    match namespace="^dms:polkit$"
+    match namespace="^dms:clipboard($|[-:].*)"
+    match namespace="^dms:polkit($|[-:].*)"
     match namespace="^dms:wifi-password$"
+    match namespace="^dms:wifi-qrcode($|:.*)"
     match namespace="^dms:bluetooth-pairing$"
     block-out-from "screencast"
     place-within-backdrop true
@@ -855,15 +865,16 @@ binds {
     Mod+Z hotkey-overlay-title="Move floating" { toggle-window-floating; }
     Mod+X hotkey-overlay-title="Reset col width" { reset-window-height; }
 
-    // ───── Special workspace (era togglespecial) ─────
-    // niri non ha "special workspace". Mappo Super+S → overview, e
-    // Super+Alt+S → invia la colonna al workspace "scratch" senza seguirla.
-    // Crea il workspace col primo focus, poi sarà sempre lì in cima.
+    // ───── Scratch nominato (non uno special workspace nascosto) ─────
+    // Super+S → overview; Super+Alt+S → invia la colonna senza seguirla;
+    // Super+Ctrl+S → raggiungi scratch (sullo stesso monitor, ripremi per
+    // tornare indietro grazie a workspace-auto-back-and-forth).
+    // Il nome è stabile, l'indice no.
     Mod+S hotkey-overlay-title="Overview" { toggle-overview; }
     Mod+Alt+S hotkey-overlay-title="Scratch (no focus)" {
-        // Workaround: muovi su workspace 99, fuori dalla rotazione abituale
-        move-column-to-workspace 99 focus=false
+        move-column-to-workspace "scratch" focus=false
     }
+    Mod+Ctrl+S hotkey-overlay-title="Focus scratch" { focus-workspace "scratch"; }
 
     // ───── Group navigation (era changegroupactive b/f) ─────
     // niri: tra finestre in colonna tabbed = focus up/down
@@ -949,7 +960,7 @@ layer-rule {
 // ╔══════════════════════════════════════════════════════════════════════╗
 // ║  Cose Hyprland che NON ho potuto mappare 1:1 — cerca "TODO" se vuoi   ║
 // ║  cambiarle:                                                           ║
-// ║   • togglespecialworkspace → workaround con overview o ws 99          ║
+// ║   • togglespecialworkspace → overview e workspace nominato scratch   ║
 // ║   • togglesplit (dwindle) → rimappato a consume-or-expel              ║
 // ║   • windowpin.sh (pin globale) → diventa toggle-floating + center     ║
 // ║   • workspace_swipe orizzontale → niri ha swipe verticale per ws e    ║

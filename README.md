@@ -36,6 +36,7 @@ no guilt, just restart.
     templates/{c,rust,zig,python}/
       shell.nix                ← LA devshell (usata anche da `nix develop ~/nixos-config#c`)
       flake.nix + .envrc       ← il boilerplate che il template copia nel progetto
+    tests/                     ← regressioni privacy/scratch e toggle gaming, senza sessione grafica
 
 ## Come funziona Nix (per chi arriva da pacman)
 
@@ -202,6 +203,44 @@ aggiornato e terminare i vecchi watcher clipboard e `wl-gammarelay`.
 I portali sono avviati dalla sessione senza restart manuali; controlla
 condivisione schermo e selettore file dopo il nuovo login.
 
+**DMS: privacy durante la condivisione.** Le regole in
+`dotfiles/niri/config.kdl` oscurano negli screencast gestiti da niri la
+clipboard (modale, popout dalla barra e menu contestuale), il QR Wi-Fi,
+il dialogo password Wi-Fi e quello di pairing Bluetooth. Non nascondono
+questi elementi sul tuo schermo e non sono una protezione universale
+contro qualsiasi metodo di cattura.
+
+Il dialogo principale di autenticazione Polkit di DMS è una finestra,
+non un layer: **non è ancora coperto**. Il match `dms:polkit…` protegge
+solo le eventuali superfici layer incorporate. Per completare la regola,
+sul portatile apri una richiesta di autenticazione senza digitare password
+e identifica `app_id` e `title` con:
+
+    niri msg --json windows
+
+Prima di condividere dati reali, verifica l'anteprima di una registrazione
+o condivisione di prova con una voce clipboard fittizia e un QR Wi-Fi di
+una rete di test. I test automatici controllano sintassi e match dei
+namespace, non il risultato visivo della cattura.
+
+**Niri: workspace scratch.** Ora è dichiarato per nome e rimane disponibile
+anche vuoto; è un workspace normale, visibile nella barra e nell'overview,
+non uno spazio nascosto in stile Hyprland. Non usa più l'indice `99`.
+Gli indici numerici degli altri workspace possono cambiare.
+
+- `Mod+Alt+S`: invia la colonna a `scratch` senza seguirla;
+- `Mod+Ctrl+S`: raggiunge `scratch`;
+- `Mod+S`: conserva l'overview.
+
+**Niri: modalità gaming.** `Mod+Alt+G` carica alternativamente la config
+gaming e quella normale. Lo stato è in `XDG_RUNTIME_DIR/niri-gamemode/`,
+separato per `NIRI_SOCKET`: al riavvio di niri non viene riutilizzato lo
+stato della vecchia istanza. La vecchia cache è ignorata, non cancellata.
+Un lock serializza pressioni ravvicinate; se niri rifiuta il cambio, lo
+stato precedente viene conservato. Usa il bind dalla sessione niri: lo
+script richiede il suo ambiente. Caricare manualmente una config fuori
+dallo script non aggiorna lo stato del toggle.
+
 **Font: Monaspace Argon.** `pkgs.monaspace` è già installato a sistema.
 Il nome della famiglia per GTK, Qt, DMS e SDDM è `Monaspace Argon`;
 `MonaspaceArgon-Regular` è invece il nome PostScript usato da Kitty.
@@ -345,8 +384,9 @@ le librerie effettivamente richieste dal progetto. Vedi la
 
 ## Comandi
 
-    # da Arch (con nix installato): la config valuta? costruisce anche il
-    # check: niri validate, UPower e font GTK/Qt/DMS/fontconfig
+    # da Arch (con nix installato): valuta i due host e costruisce i check:
+    # niri validate (normale/gaming, layout us/it), privacy/scratch,
+    # toggle gaming con IPC simulato, UPower e font GTK/Qt/DMS/fontconfig
     # NB: i flake vedono SOLO i file tracciati da git → `git add` prima
     nix flake check
 

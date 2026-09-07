@@ -74,10 +74,23 @@
         armoredcoreVIF = mkHost "armoredcoreVIF";   # il fisso: RTX 2070 nvidia
       };
 
-      # ── `nix flake check` COSTRUISCE questi: niri validate sui due config.kdl ──
-      # (è la stessa derivazione che home/desktop.nix linka in ~/.config/niri)
+      # ── `nix flake check`: config niri, regressioni e impostazioni desktop ──
+      # niri-config è la stessa derivazione linkata da home/desktop.nix.
       checks.${system} = {
         niri-config = import ./home/niri-configs.nix { inherit pkgs; };
+        niri-regressions =
+          let
+            laptopNiri = import ./home/niri-configs.nix { inherit pkgs; layout = "it"; };
+          in
+          pkgs.runCommand "niri-regressions-checked" {
+            nativeBuildInputs = [ pkgs.python3 ];
+          } ''
+            python ${./tests/niri-regressions.py} \
+              ${self.checks.${system}.niri-config}/config.kdl \
+              ${laptopNiri}/config.kdl
+            touch "$out"
+          '';
+        niri-gamemode = import ./tests/gamemode.nix { inherit pkgs; };
 
         # Verifica i font realmente risolti e i file generati, senza attivare
         # la home o dipendere dai font della macchina che esegue il check.
