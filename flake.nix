@@ -13,6 +13,7 @@
   #   helium-flake: Helium non è in nixpkgs (upstream pubblica solo .deb),
   #                 questo flake lo estrae e lo patcha. Voluto. :3
   #   llm-agents: ultime release delle CLI e app AI, aggiornabili da sole.
+  #   nix-index-database: indice precompilato per i comandi non trovati.
   #   (DMS è in nixpkgs da 26.05: niente input per lui ✓)
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
@@ -20,6 +21,11 @@
     home-manager = {
       url = "github:nix-community/home-manager";
       # single source of truth: home-manager usa il NOSTRO nixpkgs
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    nix-index-database = {
+      url = "github:nix-community/nix-index-database";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
@@ -33,7 +39,7 @@
     llm-agents.url = "github:numtide/llm-agents.nix";
   };
 
-  outputs = { self, nixpkgs, home-manager, helium-flake, llm-agents, ... }:
+  outputs = { self, nixpkgs, home-manager, nix-index-database, helium-flake, llm-agents, ... }:
     let
       system = "x86_64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
@@ -59,6 +65,7 @@
             # moduli HM esterni, disponibili a tutti i file in home/
             home-manager.sharedModules = [
               helium-flake.homeModules.default   # programs.helium.*
+              nix-index-database.homeModules.default # nix-locate + DB pronto
             ];
             # se un rebuild trova dotfiles pre-esistenti non gestiti,
             # invece di fallire li salva con questo suffisso:
@@ -107,6 +114,31 @@
           '';
         niri-gamemode = import ./tests/gamemode.nix { inherit pkgs; };
         lazyvim-nix = import ./tests/lazyvim-nix.nix { inherit pkgs; };
+        nixup = import ./tests/nixup.nix { inherit pkgs; };
+        # Costruisce il wrapper vero: writeShellApplication esegue ShellCheck.
+        # Il comando non viene avviato, quindi nessun update/switch nei test.
+        nixup-package = import ./home/nixup.nix {
+          inherit pkgs;
+          repoPath = "/home/dokkan/nixos-config";
+          hostName = "armoredcoreVIP";
+        };
+        nix-index-integration =
+          let
+            homes = map (host: self.nixosConfigurations.${host}.config.home-manager.users.dokkan)
+              [ "armoredcoreVIP" "armoredcoreVIF" ];
+            expected = nix-index-database.packages.${system}.nix-index-with-db;
+          in
+          assert pkgs.lib.all (home:
+            home.programs.nix-index.enable
+            && home.programs.nix-index.enableZshIntegration
+            && !home.programs.nix-index-database.comma.enable
+            && home.programs.nix-index.package.outPath == expected.outPath
+          ) homes;
+          # L'integrazione viene verificata senza scaricare l'intero DB
+          # a ogni test; il download avviene nel rebuild della home.
+          pkgs.runCommand "nix-index-integration-checked" { } ''
+            touch "$out"
+          '';
 
         # Verifica i font realmente risolti e i file generati, senza attivare
         # la home o dipendere dai font della macchina che esegue il check.

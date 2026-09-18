@@ -5,7 +5,7 @@ no guilt, just restart.
 
 ## Struttura
 
-    flake.nix                  ← input (nixpkgs, home-manager, helium, llm-agents), host, devshell, template
+    flake.nix                  ← input (nixpkgs, home-manager, helium, llm-agents, nix-index-database), host, devshell, template
     hosts/
       common.nix               ← tutto ciò che è uguale sui due pc: niri+DMS+SDDM, pipewire,
                                   utente, steam, docker, libvirt, mullvad, wireshark, font...
@@ -19,6 +19,8 @@ no guilt, just restart.
       niri-configs.nix         ← `niri validate`, layout per-host e workaround cursore opzionale
       shell.nix                ← zsh + p10k + alias + CLI belt
       dev.nix                  ← git/gh, direnv, neovim (LazyVim), agenti AI, .gdbinit
+      maintenance.nix          ← installa nixup per il repository e l'host corretti
+      nixup.nix + nixup.sh     ← update, check, build, confronto pacchetti e conferma
     dotfiles/
       niri/config.kdl          ← il tesoro ✓ (uno solo: sul fisso le env var nvidia
                                   arrivano dalla sessione, non dal file)
@@ -38,6 +40,7 @@ no guilt, just restart.
       flake.nix + .envrc       ← il boilerplate che il template copia nel progetto
     tests/                     ← regressioni privacy/scratch e toggle gaming, senza sessione grafica
                                   integrazione LazyVim/Mason con comandi Nix simulati
+                                  aggiornamento assistito con Nix/sudo simulati
 
 ## Come funziona Nix (per chi arriva da pacman)
 
@@ -73,13 +76,55 @@ rotto qualcosa scegli quella prima e sei a posto. Da terminale:
     sudo nixos-rebuild switch --rollback                            # torna indietro
     sudo nix-env --list-generations -p /nix/var/nix/profiles/system # storico
 
-**Aggiornare.** Il `flake.lock` inchioda la versione ESATTA di nixpkgs,
-home-manager, helium e llm-agents: due rebuild con lo stesso lock danno lo stesso
-sistema. Per aggiornare tutto (`pacman -Syu`) si sposta il lock:
+**Aggiornare.** Il `flake.lock` inchioda le revisioni di nixpkgs,
+home-manager, helium, llm-agents e nix-index-database. Il rebuild usa
+quelle revisioni; non cerca automaticamente le ultime versioni.
+Il comando assistito, disponibile dopo il rebuild che lo installa, è:
 
-    nix flake update          # scarica le versioni nuove nel lock
-    sudo nixos-rebuild switch --flake ~/nixos-config#armoredcoreVIP
-    git commit -am "bump"     # il lock è versionato: rollback anche dell'update
+    nixup          # aggiorna tutti gli input, controlla e propone il rebuild
+    nixup ai       # aggiorna soltanto llm-agents
+    nixup apply    # controlla e propone il rebuild con il lock già presente
+
+Si lancia da qualsiasi cartella, come utente normale: il pacchetto sa
+che il repo è `~/nixos-config` e quale host deve aggiornare. Rifiuta
+l'esecuzione su Arch o su un host diverso; non passargli `sudo`.
+
+Prima di `nixup`/`nixup ai`, controlla `git status` e committa le modifiche
+che vuoi conservare (anche quelle di DMS/Neovim). Il comando richiede un
+checkout pulito. Non esegue pull, commit o push: sincronizza il repo con
+`git pull --ff-only` quando serve. I file nuovi della config vanno tracciati
+con `git add`; per applicare modifiche locali già tracciate usa `nixup apply`.
+
+Il flusso è: aggiorna il lock → `nix flake check` → build del sistema
+candidato → confronto con il sistema attivo tramite `nvd` → conferma
+`[s/N]`. Invio senza risposta annulla. `sudo` viene richiesto soltanto
+dopo il consenso, per attivare esattamente il sistema mostrato nel diff.
+Check e build usano lo stesso snapshot immutabile del repository e non
+possono aggiornare gli input in memoria. Il diff mostra i pacchetti,
+non ogni cambiamento di configurazione. I dotfiles Neovim/DMS restano
+symlink live, come spiegato sotto.
+
+Se annulli o un controllo fallisce, il lock aggiornato **rimane nel repo**:
+non vengono ripristinati/cancellati file automaticamente. Puoi esaminarlo,
+correggere eventuali problemi e riprovare con `nixup apply`; questo comando
+non cerca nuove versioni. Se modifichi la lista degli input in `flake.nix`,
+allinea prima il lock con `nix flake lock`, poi usa `nixup apply`.
+
+Nessun reboot o pulizia dello store viene fatto da `nixup`. Dopo uno switch,
+riapri le applicazioni; un kernel nuovo richiede il riavvio. Quando hai
+verificato che tutto funziona, committa e pusha `flake.lock`: sull'altro PC
+bastano pull e `nixup apply`, senza un altro aggiornamento degli input.
+
+La via manuale resta disponibile, anche prima di installare `nixup`:
+
+    cd ~/nixos-config
+    nix flake update && nix flake check && sudo nixos-rebuild switch --flake .#armoredcoreVIP
+
+Per tornare alla generazione precedente: `sudo nixos-rebuild switch --rollback`,
+oppure sceglila al boot. Questo non ripristina il lock Git né i dati delle
+applicazioni. `system.stateVersion`/`home.stateVersion` non vanno cambiati
+per aggiornare i pacchetti. Plugin Neovim, tool Mason e progetti con un
+proprio lock restano aggiornamenti separati.
 
 **Aggiornare solo le app AI.** Claude Code, Codex CLI, Claude Desktop e
 ChatGPT/Codex desktop arrivano da
@@ -87,6 +132,8 @@ ChatGPT/Codex desktop arrivano da
 packaging aggiornato giornalmente. Seguono le release pubblicate, non
 build dal ramo di sviluppo; può esserci un ritardo rispetto a upstream.
 OpenCode resta nel nixpkgs del sistema, come prima.
+
+Con il comando assistito basta `nixup ai`; manualmente:
 
     cd ~/nixos-config
     nix flake update llm-agents
@@ -116,7 +163,22 @@ il lock fissa i pacchetti, non ogni componente scaricato dall'app.
 **Cercare un pacchetto.** https://search.nixos.org (pacchetti E opzioni),
 oppure `nix search nixpkgs firefox`. Per sapere in che pacchetto sta un
 comando che manca: scrivilo e basta, `nix-index` te lo dice (come
-`pacman -F`, DB da generare una volta con `nix-index`).
+`pacman -F`). Il database è già fornito da
+[nix-index-database](https://github.com/nix-community/nix-index-database):
+**non devi eseguire `nix-index` al primo boot**. L'integrazione zsh e
+`nix-locate` usano il database precompilato, fissato dal nuovo input nel lock.
+
+Si aggiorna con `nixup`, oppure soltanto l'indice con:
+
+    cd ~/nixos-config
+    nix flake update nix-index-database
+    nixup apply
+
+L'indice upstream segue nixos-unstable e non necessariamente l'esatta
+revisione del tuo nixpkgs: i suggerimenti sono utili, ma un pacchetto
+indicato potrebbe non essere disponibile nella revisione locale.
+La configurazione usa il database completo, anche per cercare file non
+eseguibili con `nix-locate`; non installa automaticamente i pacchetti suggeriti.
 
 **Provare senza installare.** Il vero superpotere:
 
@@ -443,7 +505,7 @@ le librerie effettivamente richieste dal progetto. Vedi la
     # da Arch (con nix installato): valuta i due host e costruisce i check:
     # niri validate (normale/gaming, layout us/it, workaround cursore),
     # privacy/scratch + titoli Polkit DMS, toggle gaming con IPC simulato,
-    # LazyVim/Mason con comandi simulati, UPower e font GTK/Qt/DMS/fontconfig
+    # LazyVim/Mason e nixup con comandi simulati, UPower e font GTK/Qt/DMS/fontconfig
     # NB: i flake vedono SOLO i file tracciati da git → `git add` prima
     nix flake check
 
@@ -467,8 +529,10 @@ le librerie effettivamente richieste dal progetto. Vedi la
     sudo nixos-rebuild switch --flake ~/nixos-config#armoredcoreVIP
     sudo nixos-rebuild switch --flake ~/nixos-config#armoredcoreVIF
 
-    # aggiornare gli input (nixpkgs, HM, helium) e poi rebuild:
-    nix flake update
+    # aggiornamento assistito, sul sistema NixOS installato:
+    nixup            # tutti gli input, diff e conferma prima dello switch
+    nixup ai         # soltanto llm-agents
+    nixup apply      # stesso lock, anche dopo pull o annullamento
 
     # arsenale CTF ovunque:
     nix develop ~/nixos-config#ctf
@@ -639,7 +703,7 @@ dell'installer non serve più: il flake lo ignora, puoi cancellarlo.
    nudo, senza LazyVim (successo: 2026-09-05).
 3. `cd ~/nixos-config && git commit -am "armoredcoreVIP: hardware-configuration vero" && git push`
    (fatto per armoredcoreVIP il 2026-09-05: il suo hardware-config vero è nel repo)
-4. `nix-index` (una volta: il DB per "comando non trovato → pacchetto")
+4. apri una nuova zsh: il DB per "comando non trovato → pacchetto" è già pronto
 5. apri `nvim`: lazy.nvim scarica i plugin da `dotfiles/nvim/lazy-lock.json`
 6. `mullvad account login` / login Steam / `docker run hello-world`
 7. da qui in poi: modifica → `sudo nixos-rebuild switch --flake ~/nixos-config#armoredcoreVIP`

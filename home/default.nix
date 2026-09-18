@@ -5,6 +5,7 @@
     ./desktop.nix   # niri, dotfiles, tool del desktop wayland
     ./shell.nix     # zsh + p10k + CLI belt
     ./dev.nix       # git, editor, dev quotidiano
+    ./maintenance.nix # aggiornamento assistito del sistema (nixup)
   ];
 
   home.username = "dokkan";

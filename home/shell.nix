@@ -65,9 +65,11 @@
   programs.yazi.enable = true;   # la zsh integration genera la funzione `y`
 
   # Il sostituto del command_not_found_handler basato su `pacman -F`:
-  # "comando X non trovato → è nel pacchetto Y". Serve il DB: dopo il
-  # primo boot lancia `nix-index` una volta (ci mette qualche minuto).
+  # "comando X non trovato → è nel pacchetto Y". Il modulo HM di
+  # nix-index-database fornisce già il DB: niente generazione al primo boot.
+  # L'indice segue la revisione dell'input nel flake.lock.
   programs.nix-index.enable = true;
+  programs.nix-index.enableZshIntegration = true;
 
   home.packages = with pkgs; [
     fd
