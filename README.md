@@ -102,7 +102,10 @@ candidato → confronto con il sistema attivo tramite `nvd` → conferma
 `[s/N]`. Invio senza risposta annulla. `sudo` viene richiesto soltanto
 dopo il consenso, per attivare esattamente il sistema mostrato nel diff.
 Check e build usano lo stesso snapshot immutabile del repository e non
-possono aggiornare gli input in memoria. Il diff mostra i pacchetti,
+possono aggiornare gli input in memoria. L'attivazione usa `--store-path`
+insieme a `--no-reexec`: non ricostruisce il sistema né tenta il bootstrap
+di `nixos-rebuild` cercando una configurazione tradizionale in `NIX_PATH`.
+Il diff mostra i pacchetti,
 non ogni cambiamento di configurazione. I dotfiles Neovim restano
 symlink live; gli override GUI di Noctalia sono locali, come spiegato sotto.
 
@@ -121,6 +124,18 @@ La via manuale resta disponibile, anche prima di installare `nixup`:
 
     cd ~/nixos-config
     nix flake update && nix flake check && sudo nixos-rebuild switch --flake .#armoredcoreVIP
+
+Se un vecchio `nixup` fallisce **dopo la conferma** con
+`file 'nixos-config' was not found in the Nix search path` mentre cerca
+`config.system.build.nixos-rebuild`, non ha ancora attivato il candidato.
+Dopo aver portato la correzione nel checkout del PC interessato, installala
+una volta con il comando manuale, senza aggiornare gli input:
+
+    sudo nixos-rebuild switch --no-reexec --flake ~/nixos-config#armoredcoreVIP
+
+Usa `#armoredcoreVIF` sul fisso. Poi torna a `nixup apply`: il comando
+installato viene dallo store, quindi modificare solo `home/nixup.sh` non
+aggiorna la versione già nel `PATH`. Non serve impostare `NIX_PATH`.
 
 Per tornare alla generazione precedente: `sudo nixos-rebuild switch --rollback`,
 oppure sceglila al boot. Questo non ripristina il lock Git né i dati delle

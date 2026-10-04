@@ -1,12 +1,14 @@
 """Isolated runtime tests for nixup; never execute Nix or activate a system."""
 
 import fcntl
+import importlib
 import json
 import os
 from pathlib import Path
 import subprocess
 import sys
 import tempfile
+from unittest.mock import patch
 
 
 def stub(tool, args):
@@ -184,11 +186,74 @@ class Case:
         assert events["diff"]["args"] == ["diff", str(self.current), str(self.built)]
         if "sudo" in events:
             assert events["sudo"]["args"] == [
-                self.env["NIXUP_REBUILD"], "switch", "--store-path", str(self.built),
+                self.env["NIXUP_REBUILD"], "switch", "--no-reexec", "--store-path", str(self.built),
             ], events["sudo"]
 
 
-def tests(script, snapshot):
+def assert_rebuild_entrypoint(case, rebuild_source):
+    """Exercise the locked rebuild code with the argv emitted by real nixup.
+
+    The root hand-off is replaced by a recorder; activation, version-file
+    writes, external processes and exec are forbidden. Only temporary test
+    fixtures (including the upstream module's temporary directory) are real.
+    """
+    argv = next(event["args"] for event in case.events() if event["stage"] == "sudo")
+    sys.path.insert(0, str(rebuild_source))
+    try:
+        with patch.object(sys, "dont_write_bytecode", True):
+            rebuild = importlib.import_module("nixos_rebuild")
+    finally:
+        sys.path.pop(0)
+    assert Path(rebuild.__file__).resolve().is_relative_to(rebuild_source)
+
+    class UnexpectedBuild(Exception):
+        pass
+
+    blocked = AssertionError("The rebuild regression test must not perform system operations")
+    with (
+        patch.dict(os.environ, {"NIX_PATH": "", "_NIXOS_REBUILD_REEXEC": ""}),
+        patch("subprocess.Popen", side_effect=blocked),
+        patch("os.execve", side_effect=blocked),
+        patch("os.system", side_effect=blocked),
+        patch.object(Path, "write_text", side_effect=blocked),
+        patch.object(Path, "write_bytes", side_effect=blocked),
+        patch.object(rebuild.nix, "find_file", autospec=True, return_value=None),
+        patch.object(rebuild.nix, "build", autospec=True, side_effect=UnexpectedBuild) as build,
+        patch.object(rebuild.nix, "build_flake", autospec=True, side_effect=blocked),
+        patch.object(rebuild.services, "write_version_suffix", side_effect=blocked),
+        patch.object(rebuild.services, "reexec", wraps=rebuild.services.reexec) as reexec,
+        patch.object(rebuild.services, "_activate_system", autospec=True) as activate,
+    ):
+        rebuild.execute(argv)
+        reexec.assert_not_called()
+        build.assert_not_called()
+        activate.assert_called_once()
+        applied = activate.call_args.kwargs
+        assert applied["path_to_config"] == case.built
+        assert applied["action"] == rebuild.Action.SWITCH
+        assert applied["flake"] is None
+        assert applied["target_host"] is None
+        assert applied["args"].no_reexec is True
+        assert applied["args"].store_path == str(case.built)
+
+        # Regression control: the former argv attempts a legacy build of
+        # nixos-rebuild before reaching --store-path activation. Reproduce
+        # that decision in upstream code, but stop at the mocked Nix call.
+        activate.reset_mock()
+        old_argv = [arg for arg in argv if arg != "--no-reexec"]
+        try:
+            rebuild.execute(old_argv)
+        except UnexpectedBuild:
+            pass
+        else:
+            raise AssertionError("Regression control did not reach the legacy rebuild")
+        reexec.assert_called_once()
+        build.assert_called_once()
+        assert build.call_args.args[0] == "config.system.build.nixos-rebuild"
+        activate.assert_not_called()
+
+
+def tests(script, snapshot, rebuild_source):
     def fixture(name):
         return Case(script, snapshot, name)
 
@@ -205,6 +270,8 @@ def tests(script, snapshot):
                 update_args = args[args.index("update") + 1:]
                 assert update_args == (["llm-agents"] if mode == "ai" else []), args
             case.assert_snapshot()
+            if mode == "apply":
+                assert_rebuild_entrypoint(case, rebuild_source)
 
     for response in ("no\n", "\n", "", "maybe\n"):
         with fixture("decline") as case:
@@ -291,12 +358,12 @@ def tests(script, snapshot):
         case.assert_success(case.run("--help"))
         assert case.stages() == []
 
-    print("nixup runtime tests passed (isolated stubs, no real rebuild)")
+    print("nixup runtime and locked rebuild entrypoint tests passed (no real activation)")
 
 
 if __name__ == "__main__":
     if sys.argv[1:2] == ["--stub"]:
         sys.exit(stub(sys.argv[2], sys.argv[3:]))
-    if len(sys.argv) != 3:
-        raise SystemExit("Usage: nixup.py /path/to/nixup.sh /nix/store/SNAPSHOT")
-    tests(Path(sys.argv[1]).resolve(), Path(sys.argv[2]).resolve())
+    if len(sys.argv) != 4:
+        raise SystemExit("Usage: nixup.py /path/to/nixup.sh /nix/store/SNAPSHOT /path/to/rebuild/src")
+    tests(*(Path(arg).resolve() for arg in sys.argv[1:]))

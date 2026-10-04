@@ -97,7 +97,9 @@ esac
 
 # --store-path evita una seconda valutazione: si applica proprio la closure
 # appena costruita e mostrata, non un nuovo risultato risolto come root.
-sudo "$NIXUP_REBUILD" switch --store-path "$candidate"
+# --no-reexec evita anche il bootstrap di nixos-rebuild: senza un --flake,
+# cercherebbe <nixpkgs/nixos> e <nixos-config> nonostante --store-path.
+sudo "$NIXUP_REBUILD" switch --no-reexec --store-path "$candidate"
 printf '\n%s\n' \
     'Configurazione applicata. Provala prima di committare e pubblicare flake.lock.' \
     'Se è cambiato il kernel, serve un riavvio. Nessun reboot o garbage collection automatico.'

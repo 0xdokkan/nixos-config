@@ -14,7 +14,8 @@ pkgs.runCommand "nixup-checked" {
   ];
 } ''
   # Nix, nvd, sudo e il nome host sono sostituiti dagli stub del test.
-  # Git/flock/jq restano reali; non si contatta la rete e non si attiva NixOS.
-  python ${./nixup.py} ${../home/nixup.sh} ${snapshot}
+  # Git/flock/jq restano reali. Il dispatcher nixos-rebuild bloccato dal flake
+  # viene importato con build e attivazione intercettate: niente rete o switch.
+  python ${./nixup.py} ${../home/nixup.sh} ${snapshot} ${pkgs.nixos-rebuild.src}
   touch "$out"
 ''
