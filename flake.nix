@@ -4,8 +4,11 @@
   # Vale già al primo rebuild (previa accettazione della config del flake).
   # La stessa cache è configurata nel sistema in hosts/common.nix.
   nixConfig = {
-    extra-substituters = [ "https://cache.numtide.com" ];
-    extra-trusted-public-keys = [ "niks3.numtide.com-1:DTx8wZduET09hRmMtKdQDxNNthLQETkc/yaX7M4qK0g=" ];
+    extra-substituters = [ "https://cache.numtide.com" "https://noctalia.cachix.org" ];
+    extra-trusted-public-keys = [
+      "niks3.numtide.com-1:DTx8wZduET09hRmMtKdQDxNNthLQETkc/yaX7M4qK0g="
+      "noctalia.cachix.org-1:pCOR47nnMEo5thcxNDtzWpOxNFQsBRglJzxWPp3dkU4="
+    ];
   };
 
   # ── Gli input: pochi e giustificati. Resisti all'input creep! ──
@@ -14,7 +17,7 @@
   #                 questo flake lo estrae e lo patcha. Voluto. :3
   #   llm-agents: ultime release delle CLI e app AI, aggiornabili da sole.
   #   nix-index-database: indice precompilato per i comandi non trovati.
-  #   (DMS è in nixpkgs da 26.05: niente input per lui ✓)
+  #   noctalia: release 5.2.1, indipendente dal nixpkgs del sistema.
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
 
@@ -37,12 +40,26 @@
     # Niente follows: conserva il nixpkgs testato da Numtide e i cache hit,
     # anche quando aggiorni solo questo input senza aggiornare il sistema.
     llm-agents.url = "github:numtide/llm-agents.nix";
+
+    # Release esplicita: niente salto involontario a nuove major/API IPC.
+    # Niente follows: conserva le dipendenze upstream e la cache binaria.
+    noctalia.url = "github:noctalia-dev/noctalia/v5.2.1";
   };
 
-  outputs = { self, nixpkgs, home-manager, nix-index-database, helium-flake, llm-agents, ... }:
+  outputs = { self, nixpkgs, home-manager, nix-index-database, helium-flake, llm-agents, noctalia, ... }:
     let
       system = "x86_64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
+      # La 5.2.1 espone solo il toggle manuale: due IPC additivi conservano
+      # Alt+F8 = acceso / Alt+F9 = spento anche fuori dagli orari programmati.
+      noctaliaSource = pkgs.applyPatches {
+        name = "noctalia-5.2.1-source";
+        src = noctalia.packages.${system}.default.src;
+        patches = [ ./patches/noctalia-nightlight-ipc.patch ];
+      };
+      noctaliaPackage = noctalia.packages.${system}.default.overrideAttrs (_: {
+        src = noctaliaSource;
+      });
       # le devshell dei template sono funzioni { pkgs } → mkShell:
       # le stesse identiche shell le esponiamo anche qui per uso "scratch"
       shell = name: import ./templates/${name}/shell.nix { inherit pkgs; };
@@ -61,6 +78,7 @@
             home-manager.useGlobalPkgs = true;
             home-manager.useUserPackages = true;
             home-manager.extraSpecialArgs.aiPackages = llm-agents.packages.${system};
+            home-manager.extraSpecialArgs = { inherit noctaliaPackage; };
             home-manager.users.dokkan = import ./home;
             # moduli HM esterni, disponibili a tutti i file in home/
             home-manager.sharedModules = [
@@ -97,7 +115,7 @@
             nativeBuildInputs = [ pkgs.python3 ];
           } ''
             python ${./tests/niri-regressions.py} \
-              --dms-root ${pkgs.dms-shell}/share/quickshell/dms \
+              --noctalia-root ${noctaliaSource} \
               ${self.checks.${system}.niri-config}/config.kdl \
               ${laptopNiri}/config.kdl \
               ${softwareCursorNiri}/config.kdl
@@ -113,6 +131,57 @@
             touch "$out"
           '';
         niri-gamemode = import ./tests/gamemode.nix { inherit pkgs; };
+        noctalia-idle = import ./tests/noctalia-idle.nix { inherit pkgs noctaliaSource; };
+        noctalia-nightlight = pkgs.runCommand "noctalia-nightlight-checked" {
+          nativeBuildInputs = [ pkgs.python3 pkgs.stdenv.cc ];
+        } ''
+          python ${./tests/noctalia-nightlight.py} ${noctaliaSource}
+          touch "$out"
+        '';
+        noctalia-settings = import ./tests/noctalia-settings.nix {
+          inherit pkgs noctaliaPackage;
+          configFile = self.nixosConfigurations.armoredcoreVIP.config.home-manager.users.dokkan.xdg.configFile."noctalia/config.toml".source;
+          paletteFile = ./dotfiles/noctalia/palettes/TokyoNightStorm.json;
+        };
+        noctalia-integration =
+          let
+            configs = map (host: self.nixosConfigurations.${host}.config)
+              [ "armoredcoreVIP" "armoredcoreVIF" ];
+            valid = c: let home = c.home-manager.users.dokkan; in
+              !c.programs.dms-shell.enable
+              && c.services.upower.enable
+              && c.security.polkit.enable
+              && c.services.power-profiles-daemon.enable
+              && home.programs.noctalia.enable
+              && home.programs.noctalia.systemd.enable
+              && home.programs.noctalia.package.outPath == noctaliaPackage.outPath
+              && home.programs.noctalia.settings.shell.polkit_agent
+              && home.programs.noctalia.settings.lockscreen.enabled
+              && home.programs.noctalia.settings.lockscreen.lock_before_suspend
+              && !home.programs.noctalia.settings.idle.behavior.lock.enabled
+              && !home.programs.noctalia.settings.idle.behavior.screen-off.enabled
+              && !home.programs.noctalia.settings.idle.behavior.suspend.enabled
+              && !home.programs.noctalia.settings.idle.behavior.lock-and-suspend.enabled
+              && home.systemd.user.services ? noctalia-idle
+              && home.xdg.desktopEntries ? noctalia-wifi-qr
+              && !(home.xdg.configFile ? DankMaterialShell);
+            idleCommand = builtins.head (pkgs.lib.toList
+              (builtins.head configs).home-manager.users.dokkan.systemd.user.services.noctalia-idle.Service.ExecStart);
+          in
+          assert pkgs.lib.all valid configs;
+          assert (builtins.head configs).home-manager.users.dokkan.programs.noctalia.settings
+            == (builtins.elemAt configs 1).home-manager.users.dokkan.programs.noctalia.settings;
+          pkgs.runCommand "noctalia-integration-checked" { } ''
+            # Costruisce anche il wrapper idle (incluso ShellCheck), senza avviarlo.
+            test -x ${pkgs.lib.escapeShellArg idleCommand}
+            touch "$out"
+          '';
+        noctalia-filesearch = pkgs.runCommand "noctalia-filesearch-checked" {
+          nativeBuildInputs = [ pkgs.python3 pkgs.bash pkgs.coreutils pkgs.gnugrep ];
+        } ''
+          python ${./tests/filesearch.py} ${./dotfiles/niri/scripts/filesearch.sh}
+          touch "$out"
+        '';
         lazyvim-nix = import ./tests/lazyvim-nix.nix { inherit pkgs; };
         nixup = import ./tests/nixup.nix { inherit pkgs; };
         # Costruisce il wrapper vero: writeShellApplication esegue ShellCheck.
@@ -158,6 +227,9 @@
           in
           assert laptop.services.upower.enable;
           assert home.gtk.font.name == "Monaspace Argon";
+          assert home.programs.noctalia.settings.shell.font_family == "Monaspace Argon";
+          assert !home.programs.noctalia.settings.theme.templates.enable_builtin_templates;
+          assert !home.programs.noctalia.settings.theme.templates.enable_community_templates;
           assert home.qt.platformTheme.name == "qtct";
           assert laptop.environment.sessionVariables.QT_QPA_PLATFORMTHEME == home.home.sessionVariables.QT_QPA_PLATFORMTHEME;
           pkgs.runCommand "desktop-settings-checked" {
@@ -168,8 +240,6 @@
             for family in sans-serif monospace; do
               test "$(fc-match --format '%{family}' "$family")" = 'Monaspace Argon'
             done
-            jq -e '.fontFamily == "Monaspace Argon" and .monoFontFamily == "Monaspace Argon" and .fontWeight == 400 and .qtThemingEnabled == false' \
-              ${./dotfiles/dms/settings.json}
             for ini in ${home.xdg.configFile."qt5ct/qt5ct.conf".source} ${home.xdg.configFile."qt6ct/qt6ct.conf".source}; do
               rg '^general\s*=\s*"Monaspace Argon,10"$' "$ini"
               rg '^fixed\s*=\s*"Monaspace Argon,10"$' "$ini"

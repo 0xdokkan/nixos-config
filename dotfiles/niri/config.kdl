@@ -171,29 +171,28 @@ hotkey-overlay {
 
 // La sessione niri gestisce l'ambiente systemd/D-Bus e l'avvio dei portali.
 // Le variabili delle app sono in hosts/common.nix: nessun restart manuale.
-// udiskie: gestione media rimovibili (DMS non lo include)
+// udiskie: gestione media rimovibili (Noctalia non lo include)
 spawn-at-startup "udiskie" "--no-automount" "--smart-tray"
-// DMS gestisce direttamente cronologia clipboard e filtro luce blu.
+// Noctalia gestisce direttamente cronologia clipboard e filtro luce blu.
 
-// === Rimossi perché DMS li sostituisce ===
-//   waybar              → DMS bar
-//   dunst               → DMS notifications
-//   blueman-applet      → DMS control-center (bluetooth)
-//   nm-applet           → DMS control-center (network)
-//   polkitkdeauth.sh    → DMS polkit agent
-//   batterynotify.sh    → DMS battery notifications
-//   awww-daemon + restore → DMS wallpaper engine
+// === Funzioni gestite da Noctalia ===
+//   waybar              → barra
+//   dunst               → notifiche
+//   blueman-applet      → control-center (bluetooth)
+//   nm-applet           → control-center (network)
+//   polkitkdeauth.sh    → agente polkit
+//   batterynotify.sh    → notifiche batteria
+//   awww-daemon + restore → motore wallpaper
 //
-// === DMS NON va in spawn-at-startup ===
-// programs.dms-shell.systemd.enable in hosts/common.nix lo aggancia
-// a graphical-session.target.
+// Noctalia NON va in spawn-at-startup: il servizio systemd viene avviato
+// insieme alla sessione grafica, evitando istanze duplicate.
 
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // ENVIRONMENT — identità della sessione
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // Le variabili Qt/GTK/Firefox sono in hosts/common.nix per raggiungere
-// anche i servizi systemd e il launcher DMS. Il PATH utente è in home/shell.nix.
+// anche i servizi systemd e il launcher Noctalia. Il PATH utente è in home/shell.nix.
 
 environment {
     XDG_CURRENT_DESKTOP "niri"
@@ -562,20 +561,17 @@ window-rule {
 // LAYER RULES — blur sui layer (rofi, dunst, swaync)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-// === DMS layer namespaces ===
-// Sul blur: NON serve mettere `background-effect { blur true; }` qui,
-// perché DMS usa ext-bg-effect-v1 protocol e chiede il blur al compositor
-// quando attivi "Background Blur" in Settings → Personalization → Theme.
-// Niri risponde nativamente al protocol. Le regole sotto sono per shadow
-// e privacy (screencast block-out).
+// === Noctalia 5: namespace nativi (non quelli Quickshell della v4) ===
+// Noctalia richiede il blur tramite il protocollo ext-background-effect.
+// I namespace sono controllati contro i sorgenti della versione nel lock.
 
 // Shadow sotto la bar e il dock
 layer-rule {
-    match namespace="^dms:bar$" 
+    match namespace="^noctalia-bar-.*$"
 }
 
 layer-rule {
-    match namespace="^dms:dock$"
+    match namespace="^noctalia-dock$"
     shadow {
         on
         softness 40
@@ -585,44 +581,29 @@ layer-rule {
         color "#00000064"
     }
 }
-// Privacy: oscura questi layer negli screencast gestiti da niri.
-// Clipboard comprende modale, popout dalla barra e menu contestuale;
-// il QR Wi-Fi contiene le credenziali e va protetto come la password.
-// Il dialogo Polkit principale è una FloatingWindow: è coperto dalla
-// window-rule dedicata sotto, non dal match layer dms:polkit.
+// Privacy negli screencast niri: clipboard, Polkit e credenziali Wi-Fi/BT
+// usano gli STESSI due layer degli altri pannelli. Non sono distinguibili
+// per contenuto: oscuriamo quindi anche launcher e control-center interi.
+// Barra, dock e finestra Settings restano visibili. I popup xdg figli
+// seguono la superficie genitore; il click-shield non contiene dati.
 layer-rule {
-    match namespace="^dms:clipboard($|[-:].*)"
-    match namespace="^dms:polkit($|[-:].*)"
-    match namespace="^dms:wifi-password$"
-    match namespace="^dms:wifi-qrcode($|:.*)"
-    match namespace="^dms:bluetooth-pairing$"
+    match namespace="^noctalia-panel$"
+    match namespace="^noctalia-attached-panel$"
     block-out-from "screencast"
     place-within-backdrop true
-
 }
 
-    
-// place-within-backdrop su modali/popout DMS — li mette dietro le finestre
-// in modalità overview di niri (Mod+S), per vedere meglio le finestre sotto
-layer-rule {
-    match namespace="^dms:notification-center-popout$"
-    match namespace="^dms:notification-center-modal$"
-    match namespace="^dms:control-center$"
-    place-within-backdrop true
-}
-
-// DMS shell.qml dichiara AppId com.danklinux.dms; PolkitAuthModal.qml usa
-// I18n.tr("Authentication") come titolo. Incrocia EN + tutte le traduzioni
-// del pacchetto bloccato, senza oscurare le altre finestre della shell.
-// tests/niri-regressions.py verifica questi identificativi contro DMS.
+// Il pulsante Wi-Fi QR usa nmcli in un terminale dedicato: contiene la
+// password della rete, quindi non deve comparire negli screencast.
 window-rule {
-    match app-id=r#"^com\.danklinux\.dms$"# title=r#"^(Authentication|Autenticación|Autenticazione|Autenticação|Autentisering|Authenticatie|Authentification|Authentifizierung|Aŭtentigo|Hitelesítés|Kimlik Doğrulama|Uwierzytelnianie|Xác thực|Аутентификация|אימות|احراز هویت|المصادقة|認証|认证|驗證|인증)$"#
+    match app-id=r#"^noctalia-wifi-qr$"# title=r#"^Wi-Fi QR$"#
     block-out-from "screencast"
+    open-floating true
 }
 
 // === Layer rule legacy (in caso rofi/dunst venissero comunque chiamati) ===
 // Le tengo come safety net: se uno script HyDE non patchato lancia rofi,
-// almeno il blur c'è. Non sono attive in flusso normale (DMS le sostituisce).
+// almeno il blur c'è. Non sono attive in flusso normale (Noctalia le sostituisce).
 layer-rule {
     match namespace="^rofi$"
     place-within-backdrop true
@@ -650,10 +631,9 @@ binds {
     // ───── HOTKEY OVERLAY (mostra tutti i bind al volo) ─────
     Mod+Shift+Slash { show-hotkey-overlay; }
 
-    // ───── DMS: Control center (era hyprpicker) ─────
-    // Per il color picker DMS ha il proprio: dms ipc call ... in plugins
+    // ───── Noctalia: Control center ─────
     Mod+Shift+P hotkey-overlay-title="Control center" {
-        spawn "dms" "ipc" "call" "control-center" "toggle"
+        spawn "noctalia" "msg" "panel-toggle" "control-center"
     }
 
     // ───── Window/Session actions ─────
@@ -665,27 +645,26 @@ binds {
     Mod+W hotkey-overlay-title="Toggle floating" { toggle-window-floating; }
     Mod+G hotkey-overlay-title="Toggle column tabbed" { toggle-column-tabbed-display; }
     Alt+Return hotkey-overlay-title="Fullscreen" { fullscreen-window; }
-    Mod+L hotkey-overlay-title="Lock screen (DMS)" {
-        spawn "dms" "ipc" "call" "lock" "lock"
+    Mod+L hotkey-overlay-title="Lock screen (Noctalia)" {
+        spawn "noctalia" "msg" "session" "lock"
     }
     Mod+Shift+F hotkey-overlay-title="Toggle floating + center" {
         spawn "sh" "-c" "$HOME/.config/niri/scripts/windowpin.sh"
     }
-    Mod+Backspace hotkey-overlay-title="Power menu (DMS)" {
-        spawn "dms" "ipc" "call" "powermenu" "toggle"
+    Mod+Backspace hotkey-overlay-title="Power menu (Noctalia)" {
+        spawn "noctalia" "msg" "panel-toggle" "session"
     }
-    // Toggle DMS bar (era toggle waybar)
-    Ctrl+Alt+W hotkey-overlay-title="Toggle DMS bar" {
-        spawn "dms" "ipc" "call" "bar" "toggle" "index" "0"
+    // Toggle barra principale (era toggle waybar)
+    Ctrl+Alt+W hotkey-overlay-title="Toggle Noctalia bar" {
+        spawn "noctalia" "msg" "bar-toggle"
     }
 
     // ───── Application shortcuts ─────
     Mod+T { spawn "kitty"; }
-    // File manager: nautilus ("Files" in Spotlight, quello del fisso).
-    // (DMS non ne ha uno: il suo "files" su Mod+Shift+E è la ricerca)
+    // File manager separato dalla ricerca file (Noctalia dmenu + fd).
     Mod+E { spawn "nautilus" "--new-window"; }
-    Mod+Shift+E hotkey-overlay-title="Spotlight (files)" {
-        spawn "dms" "ipc" "call" "widget" "openWith" "launcherButton" "files"
+    Mod+Shift+E hotkey-overlay-title="Search files (Noctalia)" {
+        spawn "bash" "-c" "exec \"$HOME/.config/niri/scripts/filesearch.sh\""
     }
     // era `code`: ora l'editor è neovim dentro kitty
     Mod+C hotkey-overlay-title="Neovim" { spawn "kitty" "nvim"; }
@@ -695,81 +674,83 @@ binds {
         spawn "kitty" "-e" "htop"
     }
 
-    // ───── DMS: Spotlight / Notifications / Clipboard ─────
-    // Spotlight = launcher app+file+emoji+running windows+calculator
-    Mod+Space hotkey-overlay-title="Spotlight (DMS launcher)" {
-        spawn "dms" "ipc" "call" "spotlight" "toggle"
+    // ───── Noctalia: Launcher / Notifications / Clipboard ─────
+    // App, emoji, finestre e calcolatrice; ricerca file su Mod+Shift+E.
+    Mod+Space hotkey-overlay-title="Launcher (Noctalia)" {
+        spawn "noctalia" "msg" "panel-toggle" "launcher"
     }
-    Mod+A hotkey-overlay-title="Spotlight" {
-        spawn "dms" "ipc" "call" "spotlight" "toggle"
+    Mod+A hotkey-overlay-title="Launcher" {
+        spawn "noctalia" "msg" "panel-toggle" "launcher"
     }
-    Mod+Tab hotkey-overlay-title="Spotlight" {
-        spawn "dms" "ipc" "call" "spotlight" "toggle"
+    Mod+Tab hotkey-overlay-title="Launcher" {
+        spawn "noctalia" "msg" "panel-toggle" "launcher"
     }
     // Notification center
     Mod+N hotkey-overlay-title="Notifications" {
-        spawn "dms" "ipc" "call" "notifications" "toggle"
+        spawn "noctalia" "msg" "panel-toggle" "control-center" "notifications"
     }
     Mod+Shift+N hotkey-overlay-title="Dismiss popups" {
-        spawn "dms" "ipc" "call" "notifications" "dismissAllPopups"
+        spawn "noctalia" "msg" "notification-clear-active"
     }
     // Do Not Disturb
     Mod+Ctrl+N hotkey-overlay-title="Toggle DND" {
-        spawn "dms" "ipc" "call" "notifications" "toggleDoNotDisturb"
+        spawn "noctalia" "msg" "notification-dnd-toggle"
     }
 
-    // ───── DMS: Audio (sostituisce volumecontrol.sh) ─────
+    // ───── Noctalia: Audio (sostituisce volumecontrol.sh) ─────
     Alt+F10 allow-when-locked=true {
-        spawn "dms" "ipc" "call" "audio" "mute"
+        spawn "noctalia" "msg" "volume-mute"
     }
     F11 allow-when-locked=true {
-        spawn "dms" "ipc" "call" "audio" "decrement" "5"
+        spawn "noctalia" "msg" "volume-down" "5"
     }
     F12 allow-when-locked=true {
-        spawn "dms" "ipc" "call" "audio" "increment" "5"
+        spawn "noctalia" "msg" "volume-up" "5"
     }
     XF86AudioMute allow-when-locked=true {
-        spawn "dms" "ipc" "call" "audio" "mute"
+        spawn "noctalia" "msg" "volume-mute"
     }
-    // Mic mute: DMS non ha mute mic IPC esposto, uso ancora wpctl direttamente
+    // Mic mute: conserva il controllo diretto WirePlumber anche senza shell.
     XF86AudioMicMute allow-when-locked=true {
         spawn "wpctl" "set-mute" "@DEFAULT_AUDIO_SOURCE@" "toggle"
     }
     XF86AudioLowerVolume allow-when-locked=true {
-        spawn "dms" "ipc" "call" "audio" "decrement" "5"
+        spawn "noctalia" "msg" "volume-down" "5"
     }
     XF86AudioRaiseVolume allow-when-locked=true {
-        spawn "dms" "ipc" "call" "audio" "increment" "5"
+        spawn "noctalia" "msg" "volume-up" "5"
     }
 
-    // ───── DMS: Media (sostituisce playerctl, usa MPRIS) ─────
+    // ───── Noctalia: Media (MPRIS) ─────
     XF86AudioPlay allow-when-locked=true {
-        spawn "dms" "ipc" "call" "mpris" "playPause"
+        spawn "noctalia" "msg" "media" "toggle"
     }
     XF86AudioPause allow-when-locked=true {
-        spawn "dms" "ipc" "call" "mpris" "playPause"
+        spawn "noctalia" "msg" "media" "toggle"
     }
     XF86AudioNext allow-when-locked=true {
-        spawn "dms" "ipc" "call" "mpris" "next"
+        spawn "noctalia" "msg" "media" "next"
     }
     XF86AudioPrev allow-when-locked=true {
-        spawn "dms" "ipc" "call" "mpris" "previous"
+        spawn "noctalia" "msg" "media" "previous"
     }
 
-    // ───── DMS: Brightness (sostituisce brightnesscontrol.sh) ─────
+    // ───── Noctalia: Brightness (passi del 5%) ─────
     XF86MonBrightnessUp allow-when-locked=true {
-        spawn "dms" "ipc" "call" "brightness" "increment" "5" ""
+        spawn "noctalia" "msg" "brightness-up" "current" "5%"
     }
     XF86MonBrightnessDown allow-when-locked=true {
-        spawn "dms" "ipc" "call" "brightness" "decrement" "5" ""
+        spawn "noctalia" "msg" "brightness-down" "current" "5%"
     }
 
-    // ───── Filtro luce blu (DMS; temperatura e orari dalla sua UI) ─────
-    Alt+F8 hotkey-overlay-title="Night mode on (DMS)" {
-        spawn "dms" "ipc" "call" "night" "enable"
+    // ───── Filtro luce blu (Noctalia; temperatura e orari dalla sua UI) ─────
+    // IPC idempotenti aggiunti dalla patch 5.2.1: on/off anche fuori orario
+    // e dopo un cambio dalla UI, senza toccare le preferenze salvate.
+    Alt+F8 hotkey-overlay-title="Night mode on (Noctalia)" {
+        spawn "noctalia" "msg" "nightlight-force-on"
     }
-    Alt+F9 hotkey-overlay-title="Night mode off (DMS)" {
-        spawn "dms" "ipc" "call" "night" "disable"
+    Alt+F9 hotkey-overlay-title="Night mode off (Noctalia)" {
+        spawn "noctalia" "msg" "nightlight-force-off"
     }
 
     // ───── Movimento tra finestre/colonne (in stile hyprland mapping) ─────
@@ -906,38 +887,38 @@ binds {
     Mod+Alt+P hotkey-overlay-title="Screenshot monitor" { screenshot-screen; }
     Print hotkey-overlay-title="Screenshot screen" { screenshot-screen; }
 
-    // ───── DMS: Wallpaper, Theme, Settings ─────
+    // ───── Noctalia: Wallpaper, Theme, Settings ─────
     Mod+Alt+Right hotkey-overlay-title="Next wallpaper" {
-        spawn "dms" "ipc" "call" "wallpaper" "next"
+        spawn "noctalia" "msg" "wallpaper-next"
     }
     Mod+Alt+Left hotkey-overlay-title="Prev wallpaper" {
-        spawn "dms" "ipc" "call" "wallpaper" "prev"
+        spawn "noctalia" "msg" "wallpaper-previous"
     }
     Mod+Shift+W hotkey-overlay-title="Wallpaper picker" {
-        spawn "dms" "ipc" "call" "file" "browse" "wallpaper"
+        spawn "noctalia" "msg" "panel-toggle" "wallpaper"
     }
-    // Toggle dark/light theme (DMS gestisce auto via Matugen)
+    // Toggle dark/light: variante della palette, senza cambiare temi GTK/Qt.
     Mod+Shift+T hotkey-overlay-title="Toggle theme" {
-        spawn "dms" "ipc" "call" "theme" "toggle"
+        spawn "noctalia" "msg" "theme-mode-toggle"
     }
-    // Settings UI di DMS
-    Mod+Shift+R hotkey-overlay-title="DMS settings" {
-        spawn "dms" "ipc" "call" "settings" "toggle"
+    // Settings UI di Noctalia
+    Mod+Shift+R hotkey-overlay-title="Noctalia settings" {
+        spawn "noctalia" "msg" "settings-toggle"
     }
-    // Spotlight (alias di Mod+A/Tab già sopra, solo per muscle memory HyDE)
-    Mod+Shift+A hotkey-overlay-title="Spotlight" {
-        spawn "dms" "ipc" "call" "spotlight" "toggle"
+    // Launcher (alias di Mod+A/Tab già sopra, solo per muscle memory HyDE)
+    Mod+Shift+A hotkey-overlay-title="Launcher" {
+        spawn "noctalia" "msg" "panel-toggle" "launcher"
     }
-    // Clipboard manager DMS (cronologia nativa)
+    // Clipboard manager Noctalia (cronologia nativa)
     Mod+V hotkey-overlay-title="Clipboard" {
-        spawn "dms" "ipc" "call" "clipboard" "toggle"
+        spawn "noctalia" "msg" "panel-toggle" "clipboard"
     }
     Mod+Shift+V hotkey-overlay-title="Clipboard" {
-        spawn "dms" "ipc" "call" "clipboard" "toggle"
+        spawn "noctalia" "msg" "panel-toggle" "clipboard"
     }
-    // Process manager
+    // Lista processi: Noctalia mostra metriche, htop mantiene ricerca e kill.
     Mod+Shift+Escape hotkey-overlay-title="Process list" {
-        spawn "dms" "ipc" "call" "processlist" "focusOrToggle"
+        spawn "kitty" "-e" "htop"
     }
 
     // ───── Game mode (lo script lavora ancora, swappa config niri) ─────
@@ -954,14 +935,15 @@ binds {
     // niri ha già il suo overlay built-in: Mod+Shift+Slash
     // Lo lascio in mano a quello e libero Mod+Slash.
 
-    // ───── Rimossi (non hanno equivalente DMS o non hanno più senso) ─────
-    //   Mod+Alt+Up/Down (wbarconfgen)  → DMS bar non ha "next style"
+    // ───── Binding HyDE non usati ─────
+    //   Mod+Alt+Up/Down (wbarconfgen)  → nessuno stile barra da ciclare
     //   Mod+Slash      (keybinds_hint) → uso Mod+Shift+Slash niri-native
 }
 
 // Mostra il wallpaper nella overview
 layer-rule {
-    match namespace="^quickshell$"
+    match namespace="^noctalia-wallpaper$"
+    match namespace="^noctalia-backdrop$"
     place-within-backdrop true
 }
 

@@ -10,6 +10,13 @@ se ne aggiungi uno, `chmod +x` PRIMA di committare.
 | gamemode.sh          | Mod+Alt+G | niri, libnotify, coreutils, util-linux   |
 | keyboardswitch.sh    | Mod+K     | niri, jq, libnotify                     |
 | windowpin.sh         | Mod+Shift+F | niri, jq                              |
+| filesearch.sh        | Mod+Shift+E | bash, fd, Noctalia, coreutils, grep, xdg-open |
+
+`filesearch.sh` enumera file e cartelle non nascosti della home e li mostra
+nel picker di Noctalia. Apre soltanto una voce presente nella lista, senza
+valutare il nome come comando; annullare non apre nulla. La lista temporanea
+viene rimossa all'uscita. I test coprono spazi, metacaratteri, errori e
+annullamento senza aprire file reali.
 
 `gamemode.sh` è stato riscritto per NixOS: config.kdl è read-only nello
 store, quindi invece di copiare file usa

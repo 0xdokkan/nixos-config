@@ -5,9 +5,9 @@ no guilt, just restart.
 
 ## Struttura
 
-    flake.nix                  ← input (nixpkgs, home-manager, helium, llm-agents, nix-index-database), host, devshell, template
+    flake.nix                  ← input (nixpkgs, home-manager, helium, llm-agents, nix-index-database, noctalia), host, devshell, template
     hosts/
-      common.nix               ← tutto ciò che è uguale sui due pc: niri+DMS+SDDM, pipewire,
+      common.nix               ← tutto ciò che è uguale sui due pc: niri+Noctalia+SDDM, pipewire,
                                   utente, steam, docker, libvirt, mullvad, wireshark, font...
       armoredcoreVIP/          ← il portatile, ThinkPad T470s: Intel HD 620, thermald, batteria
       armoredcoreVIF/          ← il fisso: RTX 2070 (nvidia-open), env var nvidia per niri
@@ -16,6 +16,8 @@ no guilt, just restart.
     home/                      ← la home di dokkan, identica su entrambi
       default.nix              ← entry home-manager
       desktop.nix              ← niri (config + game mode validate a build-time), app, kitty, xdg
+      noctalia.nix             ← Noctalia 5.2.1: barra, launcher, notifiche e Tokyo Night Storm
+      noctalia-idle.nix        ← profili idle batteria/alimentazione e sospensione sicura
       niri-configs.nix         ← `niri validate`, layout per-host e workaround cursore opzionale
       shell.nix                ← zsh + p10k + alias + CLI belt
       dev.nix                  ← git/gh, direnv, neovim (LazyVim), agenti AI, .gdbinit
@@ -25,12 +27,12 @@ no guilt, just restart.
       niri/config.kdl          ← il tesoro ✓ (uno solo: sul fisso le env var nvidia
                                   arrivano dalla sessione, non dal file)
       niri/config-gaming.kdl   ← include config.kdl + gap 0 + animazioni off
-      niri/scripts/            ← i 4 script dei bind (gamemode.sh riscritto per NixOS)
+      niri/scripts/            ← script dei bind (gaming, ricerca file, layout, finestre)
       kitty/theme.conf         ← Tokyo Night Storm
       zsh/p10k.zsh, extra.zsh  ← prompt + alias personali
       nvim/                    ← LazyVim (symlink live: lazy-lock.json resta scrivibile)
-      dms/                     ← impostazioni DMS (symlink live: la UI di DMS scrive qui,
-                                  poi `git commit`; il tema tokyoNightStorm è dentro)
+      noctalia/palettes/       ← Tokyo Night Storm, varianti dark e light
+      dms/                     ← archivio della vecchia shell, non installato né avviato
       cava/config              ← il gradiente
       fastfetch/               ← config.jsonc + images/ (le immagini del logo vanno qui)
       gtk/Tokyo-Night/         ← il tema GTK di HyDE (Tokyonight-Storm): nautilus & co.
@@ -77,7 +79,7 @@ rotto qualcosa scegli quella prima e sei a posto. Da terminale:
     sudo nix-env --list-generations -p /nix/var/nix/profiles/system # storico
 
 **Aggiornare.** Il `flake.lock` inchioda le revisioni di nixpkgs,
-home-manager, helium, llm-agents e nix-index-database. Il rebuild usa
+home-manager, helium, llm-agents, nix-index-database e noctalia. Il rebuild usa
 quelle revisioni; non cerca automaticamente le ultime versioni.
 Il comando assistito, disponibile dopo il rebuild che lo installa, è:
 
@@ -90,7 +92,7 @@ che il repo è `~/nixos-config` e quale host deve aggiornare. Rifiuta
 l'esecuzione su Arch o su un host diverso; non passargli `sudo`.
 
 Prima di `nixup`/`nixup ai`, controlla `git status` e committa le modifiche
-che vuoi conservare (anche quelle di DMS/Neovim). Il comando richiede un
+che vuoi conservare (anche quelle di Neovim). Il comando richiede un
 checkout pulito. Non esegue pull, commit o push: sincronizza il repo con
 `git pull --ff-only` quando serve. I file nuovi della config vanno tracciati
 con `git add`; per applicare modifiche locali già tracciate usa `nixup apply`.
@@ -101,8 +103,8 @@ candidato → confronto con il sistema attivo tramite `nvd` → conferma
 dopo il consenso, per attivare esattamente il sistema mostrato nel diff.
 Check e build usano lo stesso snapshot immutabile del repository e non
 possono aggiornare gli input in memoria. Il diff mostra i pacchetti,
-non ogni cambiamento di configurazione. I dotfiles Neovim/DMS restano
-symlink live, come spiegato sotto.
+non ogni cambiamento di configurazione. I dotfiles Neovim restano
+symlink live; gli override GUI di Noctalia sono locali, come spiegato sotto.
 
 Se annulli o un controllo fallisce, il lock aggiornato **rimane nel repo**:
 non vengono ripristinati/cancellati file automaticamente. Puoi esaminarlo,
@@ -125,6 +127,12 @@ oppure sceglila al boot. Questo non ripristina il lock Git né i dati delle
 applicazioni. `system.stateVersion`/`home.stateVersion` non vanno cambiati
 per aggiornare i pacchetti. Plugin Neovim, tool Mason e progetti con un
 proprio lock restano aggiornamenti separati.
+
+**Versione di Noctalia.** L'input è fissato al tag `v5.2.1`, non al ramo
+di sviluppo. Anche `nixup` lo mantiene su questa release: per passare a
+una nuova release cambia il tag in `flake.nix`, poi esegui
+`nix flake update noctalia` e `nixup apply`. Gli IPC e lo schema vengono
+verificati dai test: un cambio di versione può richiedere adattamenti.
 
 **Aggiornare solo le app AI.** Claude Code, Codex CLI, Claude Desktop e
 ChatGPT/Codex desktop arrivano da
@@ -198,11 +206,16 @@ più vecchie di 14 giorni + gc; nel menu di boot al massimo 10 voci. A mano:
 
 **Dotfiles.** home-manager NON copia i tuoi file in `~/.config`: ci mette
 symlink che puntano nello store, quindi sono read-only. Si modificano
-nel repo e si fa il rebuild. Due eccezioni volute, i symlink "live" che
-puntano DENTRO `~/nixos-config/dotfiles/`: `~/.config/nvim` (lazy.nvim
-scrive il lockfile) e `~/.config/DankMaterialShell` (la UI di DMS scrive
-settings.json). Lì le modifiche le fai dal programma, e poi le committi:
-`git status` in `~/nixos-config` te le mostra.
+nel repo e si fa il rebuild. L'eccezione voluta è `~/.config/nvim`, un
+symlink "live" DENTRO `~/nixos-config/dotfiles/nvim`: lazy.nvim scrive il
+lockfile e `git status` mostra le modifiche da committare.
+
+Noctalia v5 usa due livelli: `home/noctalia.nix` genera i default condivisi
+in `~/.config/noctalia/config.toml`; la GUI salva gli override scrivibili in
+`~/.local/state/noctalia/settings.toml`. Gli override **vincono sui default**
+e restano locali al PC: per condividere una preferenza portala nel modulo
+Nix e rimuovi solo l'override corrispondente, a shell ferma. Il rebuild non
+azzera questi dati. Vedi la [configurazione upstream](https://docs.noctalia.dev/noctalia/configuration/).
 
 **LazyVim, Mason e Nix.** `lazy.nvim` continua a scaricare e aggiornare i
 plugin al primo avvio e successivamente; il symlink live e `lazy-lock.json`
@@ -231,9 +244,10 @@ anche delle proprie librerie, non soltanto di un eseguibile nel `PATH`.
 Riferimenti: [LSP in LazyVim](https://www.lazyvim.org/plugins/lsp) e
 [configurazione Mason](https://github.com/mason-org/mason.nvim#default-configuration).
 
-**DMS: blocco e risparmio energetico.** In `dotfiles/dms/settings.json`
-il blocco prima della sospensione è attivo. I timeout sono in secondi,
-misurati dall'ultima attività:
+**Noctalia: blocco e risparmio energetico.** Noctalia è l'unico locker e
+gestisce il blocco prima della sospensione. Poiché la 5.2.1 non ha due
+profili idle nativi, `home/noctalia-idle.nix` avvia un solo `swayidle` con
+i timeout originali, misurati dall'ultima attività:
 
 | profilo | blocco schermo | spegnimento schermo | sospensione |
 |---------|----------------|---------------------|-------------|
@@ -241,18 +255,29 @@ misurati dall'ultima attività:
 | alimentazione | 15 minuti | 20 minuti | disattivata |
 
 La configurazione è condivisa: il profilo alimentazione vale anche sul
-fisso. Puoi cambiare i tempi dalla UI di DMS e committare `settings.json`.
-Il comportamento sul portatile va verificato anche chiudendo il coperchio:
+fisso. Cambia i tempi in `home/noctalia-idle.py` e fai il rebuild; non
+riattivare anche i timer idle dalla GUI di Noctalia, altrimenti avresti
+due gestori. UPower viene letto ogni 5 secondi: al cambio alimentazione
+i timer ripartono da zero e gli schermi si riaccendono, senza sbloccare.
+Se UPower non risponde, si usano blocco a 5 minuti e schermo a 6 minuti,
+ma nessuna sospensione automatica. Il backend di sospensione rispetta
+gli inibitori logind senza tentare comandi alternativi che li aggirino.
+Non viene riprodotta la dissolvenza preventiva di 5 secondi di DMS.
+Se la sospensione è bloccata al timeout, verrà riprovata al prossimo
+ciclo idle (nuova attività e inattività, oppure cambio alimentazione),
+non immediatamente alla chiusura della CLI.
+Il comportamento reale va verificato anche chiudendo il coperchio:
 alla riapertura la sessione deve richiedere lo sblocco.
 
-**DMS: batteria del portatile.** `services.upower.enable = true` è in
-`hosts/armoredcoreVIP/configuration.nix`: UPower espone le batterie a DMS.
+**Noctalia: batteria del portatile.** `services.upower.enable = true` è in
+`hosts/common.nix`: UPower espone le batterie a Noctalia e ai profili idle.
 `power-profiles-daemon` gestisce i profili e non lo sostituisce; il widget
 batteria è già incluso nella barra. Dopo il rebuild, se non compare:
 
     systemctl status upower
     upower -d
-    systemctl --user restart dms
+    systemctl --user status noctalia noctalia-idle
+    journalctl --user -b -u noctalia -u noctalia-idle
 
 Se UPower non elenca batterie, controlla `ls /sys/class/power_supply` e
 `journalctl -b -u upower`: il problema è a monte del widget. La verifica
@@ -282,46 +307,72 @@ può essere bloccata finché una CLI è aperta; termina le CLI prima di sospende
 Questi wrapper proteggono le CLI nel PATH, NON automaticamente le sessioni
 avviate dalle app desktop, che possono usare un proprio runtime incluso.
 
-**DMS: clipboard e luce notturna.** La cronologia è quella nativa di DMS
+**Noctalia: clipboard e luce notturna.** La cronologia è quella nativa di Noctalia
 (`Mod+V`), senza watcher `cliphist` aggiuntivi. `wl-copy` e `wl-paste`
 restano disponibili per Neovim e il terminale. `Alt+F8` abilita la luce
-notturna di DMS, `Alt+F9` la disabilita; temperatura e programmazione si
-regolano dalla UI di DMS e restano nello stato della singola macchina.
+notturna immediatamente, `Alt+F9` la disabilita, indipendentemente dagli
+orari; temperatura e programmazione si regolano dalla UI di Noctalia.
+Una piccola patch locale aggiunge gli IPC espliciti `nightlight-force-on`
+e `nightlight-force-off` alla 5.2.1, che offre solo il toggle manuale.
+La patch non modifica il funzionamento dei controlli nella GUI; quando
+aggiorni Noctalia, anche questa integrazione viene verificata dai test.
 
 Dopo il rebuild, esci dalla sessione e rientra per applicare l'ambiente
-aggiornato e terminare i vecchi watcher clipboard e `wl-gammarelay`.
+aggiornato e terminare DMS o eventuali vecchi watcher clipboard/gamma.
 I portali sono avviati dalla sessione senza restart manuali; controlla
 condivisione schermo e selettore file dopo il nuovo login.
 
-**DMS: privacy durante la condivisione.** Le regole in
-`dotfiles/niri/config.kdl` oscurano negli screencast gestiti da niri la
-clipboard (modale, popout dalla barra e menu contestuale), il QR Wi-Fi,
-il dialogo password Wi-Fi e quello di pairing Bluetooth. Non nascondono
-questi elementi sul tuo schermo e non sono una protezione universale
-contro qualsiasi metodo di cattura.
+**Noctalia: privacy durante la condivisione.** Le regole in
+`dotfiles/niri/config.kdl` oscurano i layer `noctalia-panel` e
+`noctalia-attached-panel` negli screencast gestiti da niri. Noctalia 5.2.1
+riusa questi namespace per clipboard, autenticazione Polkit e pannelli
+rete/Bluetooth: per proteggerli vengono oscurati anche launcher,
+control center e gli altri pannelli condivisi. Barra, dock, notifiche e
+finestra delle impostazioni non sono oscurati dalla regola.
 
-Il dialogo principale di autenticazione Polkit di DMS è una finestra,
-non un layer: ora ha una `window-rule` dedicata che incrocia l'app-id
-`com.danklinux.dms` con il titolo `Authentication` e le sue traduzioni
-(italiano: `Autenticazione`). Gli identificativi provengono da `shell.qml`
-e `Modals/PolkitAuthModal.qml` del pacchetto DMS bloccato nel flake;
-il [pragma AppId di Quickshell](https://quickshell.org/docs/v0.3.0/guide/advanced/#appid)
-imposta l'identificativo delle finestre. Non vengono oscurate tutte le
-finestre DMS: impostazioni e notepad restano fuori da questa regola.
-Il match layer `dms:polkit…` copre invece le superfici incorporate.
-
-`nix flake check` confronta app-id, titolo e traduzioni con il pacchetto
-DMS: se cambiano, il test richiede di rivedere la regola. Per confermare
-i valori sul portatile, apri una richiesta di autenticazione senza
-digitare password e controlla `app_id` e `title` con:
-
-    niri msg --json windows
-
+Questa protezione non nasconde nulla sul tuo monitor e non copre ogni
+possibile metodo di cattura. `nix flake check` confronta i namespace e
+la struttura dei pannelli con il sorgente della versione installata.
 Prima di condividere dati reali, verifica l'anteprima di una registrazione
-o condivisione di prova con una voce clipboard fittizia e un QR Wi-Fi di
-una rete di test; controlla anche il dialogo di autenticazione, senza
-inserire password. I test automatici controllano sintassi e identificativi,
-non il risultato visivo della cattura.
+con una voce clipboard fittizia e una richiesta Polkit senza digitare
+password. I test statici non sostituiscono la prova della cattura reale.
+
+**Scorciatoie e differenze fra shell.** Tutte le combinazioni di tasti
+restano le stesse, comprese quelle di niri e la modalità gaming. Noctalia
+usa `noctalia msg …`, non i comandi della vecchia versione Quickshell.
+`Mod+Shift+E` cerca file/cartelle nella home con `fd` e il picker dmenu di
+Noctalia, poi li apre con l'app MIME; file nascosti/ignorati non sono
+inclusi e non viene creato un indice. `Mod+Shift+Escape` apre `htop` in
+Kitty: Noctalia non ha il popover della lista processi di DMS.
+
+Per visualizzare credenziali e QR della rete Wi-Fi attiva, cerca **Wi-Fi QR**
+nel launcher oppure fai clic centrale sul widget del control center.
+Si apre una finestra Kitty dedicata con `nmcli`, protetta
+dallo screencast tramite app-id e titolo esatti; non vengono creati file
+con password né copiate credenziali nella clipboard. Chiudi la finestra
+quando hai finito. Questa è una funzione aggiunta perché Noctalia 5.2.1
+non ha il QR Wi-Fi nativo di DMS.
+
+Il layout di control center e notifiche è quello di Noctalia, non una
+copia pixel-per-pixel di DMS; i colori Storm e il font restano coerenti.
+Al primo accesso scegli wallpaper e località meteo dalla GUI: erano
+nello stato locale di DMS, non nei file versionati. La vecchia cronologia
+clipboard/notepad non viene importata né cancellata. `dotfiles/dms/`
+rimane un archivio non installato, utile anche per tornare indietro.
+
+**Applicare la migrazione.** Sul PC interessato, dopo aver sincronizzato
+il repo e tracciato i nuovi file, usa `nixup apply` oppure il normale
+`sudo nixos-rebuild switch --flake ~/nixos-config#armoredcoreVIP`
+(`#armoredcoreVIF` sul fisso). Salva il lavoro ed esci/rientra nella
+sessione: non avviare DMS e Noctalia insieme. SDDM e niri restano gli stessi.
+La patch IPC locale richiede la compilazione di Noctalia al primo rebuild;
+la cache upstream resta utile per le dipendenze, non per il binario patchato.
+
+Prima di considerare concluso il passaggio sul portatile, prova `Mod+L`
+e lo sblocco, sospensione/ripresa e coperchio, i tasti multimediali,
+`Alt+F8/F9`, batteria/clipboard e un'anteprima di screensharing con dati
+fittizi. Mantieni una generazione precedente nel bootloader per il rollback.
+Le verifiche del flake non possono collaudare GPU, PAM e coperchio reali.
 
 **Niri: workspace scratch.** Ora è dichiarato per nome e rimane disponibile
 anche vuoto; è un workspace normale, visibile nella barra e nell'overview,
@@ -360,19 +411,20 @@ disabilitarlo, ricommenta la riga e fai rebuild. Esci e rientra nella
 sessione per applicare il cambio dell'ambiente e del flag di debug.
 
 **Font: Monaspace Argon.** `pkgs.monaspace` è già installato a sistema.
-Il nome della famiglia per GTK, Qt, DMS e SDDM è `Monaspace Argon`;
+Il nome della famiglia per GTK, Qt, Noctalia e SDDM è `Monaspace Argon`;
 `MonaspaceArgon-Regular` è invece il nome PostScript usato da Kitty.
 La configurazione imposta:
 
 - `hosts/common.nix`: default fontconfig sans-serif/monospace e login SDDM;
 - `home/desktop.nix`: GTK e font monospace dconf a 10 pt, Qt5/Qt6 a 10 pt;
-- `dotfiles/dms/settings.json`: font UI e monospace della shell, peso 400;
+- `home/noctalia.nix`: font della shell e peso 400 nella barra;
 - Kitty: conserva il font Regular e la dimensione 9 già scelti.
 
 Qt è gestito da Home Manager con i plugin qt5ct/qt6ct; i due file INI
 sono read-only, quindi cambia i font in `home/desktop.nix`, non dalle loro
-GUI. Lascia `qtThemingEnabled=false` in DMS per non avere due gestori sugli
-stessi file. Dopo il rebuild esci e rientra, e riapri le app. Per verificare:
+GUI. Lascia disabilitati i template di theming delle app in Noctalia per
+non avere due gestori sugli stessi file. Dopo il rebuild esci e rientra,
+e riapri le app. Per verificare:
 
     fc-match sans-serif
     fc-match monospace
@@ -504,8 +556,9 @@ le librerie effettivamente richieste dal progetto. Vedi la
 
     # da Arch (con nix installato): valuta i due host e costruisce i check:
     # niri validate (normale/gaming, layout us/it, workaround cursore),
-    # privacy/scratch + titoli Polkit DMS, toggle gaming con IPC simulato,
-    # LazyVim/Mason e nixup con comandi simulati, UPower e font GTK/Qt/DMS/fontconfig
+    # privacy/scratch + namespace/IPC Noctalia, toggle gaming con IPC simulato,
+    # LazyVim/Mason e nixup con comandi simulati, UPower e font GTK/Qt/fontconfig,
+    # Noctalia: schema/palette reali, ricerca file, luce notturna e profili idle
     # NB: i flake vedono SOLO i file tracciati da git → `git add` prima
     nix flake check
 
@@ -685,7 +738,7 @@ da qui in poi li abilita la config stessa):
 
     sudo nixos-rebuild switch --flake ~/nixos-config#armoredcoreVIP \
       --option experimental-features "nix-command flakes"
-    reboot     # SDDM → niri → DMS
+    reboot     # SDDM → niri → Noctalia
 
 **5. Dopo:** `git commit -am "armoredcoreVIP: hardware-configuration vero" && git push`,
 poi i punti 4-7 di "Post primo boot". `/etc/nixos/configuration.nix`
@@ -709,7 +762,7 @@ dell'installer non serve più: il flake lo ignora, puoi cancellarlo.
 7. da qui in poi: modifica → `sudo nixos-rebuild switch --flake ~/nixos-config#armoredcoreVIP`
 
 Note:
-- `dms setup` NON serve: config.kdl non usa gli include DMS (come su Arch)
+- non lanciare `dms setup`: la shell è Noctalia, configurata da Home Manager
   e comunque è read-only nello store.
 - Game mode (Mod+Alt+G) usa `niri msg action load-config-file --path`:
   niente più copie di file, `config-gaming.kdl` non può andare fuori sync.

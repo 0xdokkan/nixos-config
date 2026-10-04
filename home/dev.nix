@@ -2,7 +2,7 @@
 
 let
   # Protegge l'intera sessione CLI, anche mentre aspetta un nuovo prompt.
-  # L'inibitore riguarda solo sleep: DMS continua a bloccare e spegnere
+  # L'inibitore riguarda solo sleep: il desktop continua a bloccare e spegnere
   # lo schermo. systemd lo rilascia quando il comando termina.
   keepAwake = package: command:
     let

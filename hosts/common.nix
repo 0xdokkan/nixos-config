@@ -41,8 +41,11 @@ in
   nixpkgs.config.allowUnfree = true;   # discord, steam, obsidian, claude-code, nvidia...
   # Cache pubblicata da Numtide per llm-agents: evita di compilare Codex.
   # È una fonte di binari fidata aggiuntiva, con verifica della firma.
-  nix.settings.extra-substituters = [ "https://cache.numtide.com" ];
-  nix.settings.extra-trusted-public-keys = [ "niks3.numtide.com-1:DTx8wZduET09hRmMtKdQDxNNthLQETkc/yaX7M4qK0g=" ];
+  nix.settings.extra-substituters = [ "https://cache.numtide.com" "https://noctalia.cachix.org" ];
+  nix.settings.extra-trusted-public-keys = [
+    "niks3.numtide.com-1:DTx8wZduET09hRmMtKdQDxNNthLQETkc/yaX7M4qK0g="
+    "noctalia.cachix.org-1:pCOR47nnMEo5thcxNDtzWpOxNFQsBRglJzxWPp3dkU4="
+  ];
 
   # ══ Pulizia automatica dello store ══════════════════════════════════
   # Ogni rebuild lascia la generazione precedente (è il rollback). Senza
@@ -115,25 +118,18 @@ in
     };
   };
 
-  # ══ Desktop: niri + DMS + SDDM ══════════════════════════════════════
+  # ══ Desktop: niri + Noctalia + SDDM ════════════════════════════════
   # programs.niri porta con sé: sessione per SDDM, xdg-desktop-portal
   # (gnome + gtk, come su Arch), gnome-keyring, xwayland-satellite.
   programs.niri.enable = true;
 
-  # DankMaterialShell è in nixpkgs da 26.05 (opzione `programs.dms-shell`,
-  # NON `programs.dank-material-shell`: quello è il nome nel flake DMS).
-  # NB: config.kdl non fa `include "dms/..."`, come su Arch — quindi
-  # `dms setup` non serve (e non potrebbe comunque scrivere in config.kdl,
-  # che è read-only nello store).
-  programs.dms-shell = {
-    enable = true;
-    # parte come user service agganciato alla sessione di niri, quindi
-    # NON va in spawn-at-startup (config.kdl lo sa già)
-    systemd.enable = true;
-    enableSystemMonitoring = true;   # dgop: widget cpuUsage/memUsage della bar
-    enableAudioWavelength = true;    # cava: visualizzatore nel widget media
-    enableDynamicTheming = true;     # matugen: se mai scegli il tema "auto"
-  };
+  # Noctalia è installato e avviato UNA volta dal modulo Home Manager
+  # home/noctalia.nix. DMS non è più installato/avviato. Non aggiungere
+  # spawn-at-startup in niri: il servizio segue graphical-session.target.
+  # Il lock nativo 5.2.1 usa lo stack PAM "login" già fornito da NixOS.
+  # UPower serve sia al widget batteria sia ai profili idle, anche sul fisso
+  # (che senza batterie viene trattato come alimentato da rete).
+  services.upower.enable = true;
 
   services.displayManager.sddm = {
     enable = true;
@@ -143,10 +139,10 @@ in
     extraPackages = with pkgs.kdePackages; [ qtsvg qtmultimedia qtvirtualkeyboard ];
   };
 
-  security.polkit.enable = true;   # DMS ha il suo agent, ma il demone è qui
+  security.polkit.enable = true;   # Noctalia ha il suo agent, il demone è qui
   programs.dconf.enable = true;    # serve a HM dconf.settings (virt-manager)
 
-  # Il widget "power profile" del control-center DMS parla con questo
+  # Il widget "power profile" del control-center Noctalia parla con questo
   # (su Arch non c'era: il widget era vuoto). Sul portatile, se un giorno
   # attivi TLP, SPEGNI questo: sono in conflitto.
   services.power-profiles-daemon.enable = true;
@@ -155,7 +151,7 @@ in
   # Sostituisce i vari ~/.config/*-flags.conf di Arch. Lo legge anche il
   # wrapper di helium.
   # niri-session importa l'ambiente prima di avviare i servizi utente:
-  # queste variabili arrivano anche a DMS e alle app aperte dal launcher.
+  # queste variabili arrivano anche a Noctalia e alle app aperte dal launcher.
   environment.sessionVariables = {
     NIXOS_OZONE_WL = "1";
     QT_QPA_PLATFORM = "wayland;xcb";
