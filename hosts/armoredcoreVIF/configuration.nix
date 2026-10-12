@@ -34,8 +34,11 @@
     # cioè il più recente: se lo rivuoi, scommenta (può rompersi con i
     # kernel nuovissimi, a te la scelta)
     # package = config.boot.kernelPackages.nvidiaPackages.latest;
-    # Sospensione/ripresa con nvidia: attivalo solo se S3 ti dà problemi
-    powerManagement.enable = false;
+    # Sospensione/ripresa: salva la VRAM prima dello sleep
+    # (NVreg_PreserveVideoMemoryAllocations), altrimenti su Wayland al
+    # resume le finestre possono tornare nere o corrotte. Con driver open
+    # >= 595 NixOS usa i suspend notifier del kernel, senza servizi systemd.
+    powerManagement.enable = true;
   };
   hardware.graphics.extraPackages = with pkgs; [
     nvidia-vaapi-driver   # VAAPI via NVDEC (era l'extension flatpak su Arch)
@@ -44,12 +47,35 @@
   # ══ Le env var nvidia che erano nel config.kdl di Hyprland/HyDE ═════
   # config.kdl è condiviso col portatile e non le ha più: qui le mettiamo
   # nella sessione utente, così niri e tutto ciò che lancia le ereditano.
+  # GBM_BACKEND e __GLX_VENDOR_LIBRARY_NAME non servono più con i driver
+  # recenti (GBM e glvnd trovano nvidia da soli) e GBM_BACKEND è il primo
+  # sospettato quando Firefox/Electron crashano: rimettile solo se servono.
   environment.sessionVariables = {
-    GBM_BACKEND = "nvidia-drm";
-    __GLX_VENDOR_LIBRARY_NAME = "nvidia";
     LIBVA_DRIVER_NAME = "nvidia";
     __GL_VRR_ALLOWED = "1";
   };
+
+  # ══ niri su NVIDIA: VRAM ════════════════════════════════════════════
+  # Il driver non restituisce al pool la VRAM liberata dai compositor
+  # Wayland: niri arriva verso 1 GiB invece di ~100 MiB (controlla con
+  # nvtop). NVIDIA ha già un profilo "No VidMem Reuse" per Hyprland, kwin,
+  # mutter, wlroots, Xwayland... ma non per niri: questo è il fix della
+  # wiki di niri (docs/wiki/Nvidia.md).
+  environment.etc."nvidia/nvidia-application-profiles-rc.d/50-limit-free-buffer-pool-in-wayland-compositors.json".text =
+    builtins.toJSON {
+      rules = [
+        {
+          pattern = { feature = "procname"; matches = "niri"; };
+          profile = "Limit Free Buffer Pool On Wayland Compositors";
+        }
+      ];
+      profiles = [
+        {
+          name = "Limit Free Buffer Pool On Wayland Compositors";
+          settings = [ { key = "GLVidHeapReuseRatio"; value = 0; } ];
+        }
+      ];
+    };
 
   # NIRI_DISABLE_HARDWARE_CURSORS non è un'opzione di niri.
   # Se il cursore dà problemi, abilita il workaround KDL disable-cursor-plane

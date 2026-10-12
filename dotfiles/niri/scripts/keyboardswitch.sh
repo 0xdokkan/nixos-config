@@ -15,5 +15,5 @@ lay_main=$(niri msg --json keyboard-layouts 2>/dev/null \
 [ -z "${lay_main}" ] && lay_main="(layout)"
 
 notify-send -a "t1" -r 91190 -t 800 \
-    -i "${HOME}/.config/dunst/icons/keyboard.svg" \
+    -i input-keyboard \
     "${lay_main}"

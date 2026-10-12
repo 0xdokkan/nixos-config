@@ -4,10 +4,9 @@
   # Vale già al primo rebuild (previa accettazione della config del flake).
   # La stessa cache è configurata nel sistema in hosts/common.nix.
   nixConfig = {
-    extra-substituters = [ "https://cache.numtide.com" "https://noctalia.cachix.org" ];
+    extra-substituters = [ "https://cache.numtide.com" ];
     extra-trusted-public-keys = [
       "niks3.numtide.com-1:DTx8wZduET09hRmMtKdQDxNNthLQETkc/yaX7M4qK0g="
-      "noctalia.cachix.org-1:pCOR47nnMEo5thcxNDtzWpOxNFQsBRglJzxWPp3dkU4="
     ];
   };
 
@@ -17,7 +16,7 @@
   #                 questo flake lo estrae e lo patcha. Voluto. :3
   #   llm-agents: ultime release delle CLI e app AI, aggiornabili da sole.
   #   nix-index-database: indice precompilato per i comandi non trovati.
-  #   noctalia: release 5.2.1, indipendente dal nixpkgs del sistema.
+  #   noctalia: release 5.2.1, compilata col nixpkgs del sistema.
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
 
@@ -42,8 +41,14 @@
     llm-agents.url = "github:numtide/llm-agents.nix";
 
     # Release esplicita: niente salto involontario a nuove major/API IPC.
-    # Niente follows: conserva le dipendenze upstream e la cache binaria.
-    noctalia.url = "github:noctalia-dev/noctalia/v5.2.1";
+    # follows: con la patch locale il binario non è mai nella cache upstream,
+    # quindi si compila comunque. Con il nostro nixpkgs almeno glibc e PAM
+    # sono quelli del sistema: il lockscreen carica in-process i moduli PAM
+    # di NixOS, che con una glibc più vecchia potrebbero non caricarsi.
+    noctalia = {
+      url = "github:noctalia-dev/noctalia/v5.2.1";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs = { self, nixpkgs, home-manager, nix-index-database, helium-flake, llm-agents, noctalia, ... }:
@@ -77,8 +82,10 @@
           {
             home-manager.useGlobalPkgs = true;
             home-manager.useUserPackages = true;
-            home-manager.extraSpecialArgs.aiPackages = llm-agents.packages.${system};
-            home-manager.extraSpecialArgs = { inherit noctaliaPackage; };
+            home-manager.extraSpecialArgs = {
+              inherit noctaliaPackage;
+              aiPackages = llm-agents.packages.${system};
+            };
             home-manager.users.dokkan = import ./home;
             # moduli HM esterni, disponibili a tutti i file in home/
             home-manager.sharedModules = [
@@ -88,6 +95,10 @@
             # se un rebuild trova dotfiles pre-esistenti non gestiti,
             # invece di fallire li salva con questo suffisso:
             home-manager.backupFileExtension = "hm-backup";
+            # ...e se il backup esiste già (es. mimeapps.list riscritto due
+            # volte da "imposta come predefinito") lo sovrascrive invece di
+            # far fallire l'attivazione della home.
+            home-manager.overwriteBackup = true;
           }
         ];
       };
@@ -105,7 +116,10 @@
         niri-config = import ./home/niri-configs.nix { inherit pkgs; };
         niri-regressions =
           let
-            laptopNiri = import ./home/niri-configs.nix { inherit pkgs; layout = "it"; };
+            laptopNiri = import ./home/niri-configs.nix { inherit pkgs; layout = "it,us"; };
+            # i host.kdl VERI che home-manager linka su ciascun host
+            hostKdl = host:
+              self.nixosConfigurations.${host}.config.home-manager.users.dokkan.xdg.configFile."niri/host.kdl".source;
             softwareCursorNiri = import ./home/niri-configs.nix {
               inherit pkgs;
               disableCursorPlane = true;
@@ -120,13 +134,20 @@
               ${laptopNiri}/config.kdl \
               ${softwareCursorNiri}/config.kdl
             python - ${self.checks.${system}.niri-config}/host.kdl \
-              ${laptopNiri}/host.kdl ${softwareCursorNiri}/host.kdl <<'PY'
+              ${laptopNiri}/host.kdl ${softwareCursorNiri}/host.kdl \
+              ${hostKdl "armoredcoreVIP"} ${hostKdl "armoredcoreVIF"} <<'PY'
             import sys
             from pathlib import Path
-            desktop, laptop, workaround = (Path(p).read_text() for p in sys.argv[1:])
+            desktop, laptop, workaround, real_vip, real_vif = (
+                Path(p).read_text() for p in sys.argv[1:]
+            )
             assert "disable-cursor-plane" not in desktop
             assert "disable-cursor-plane" not in laptop
             assert "disable-cursor-plane" in workaround
+            # Portatile: it + us su Mod+K (solo niri). Fisso: solo us.
+            assert 'layout "it,us"' in real_vip
+            assert 'layout "us"' in real_vif
+            assert "disable-cursor-plane" not in real_vip + real_vif
             PY
             touch "$out"
           '';

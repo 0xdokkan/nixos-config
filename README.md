@@ -32,7 +32,6 @@ no guilt, just restart.
       zsh/p10k.zsh, extra.zsh  ← prompt + alias personali
       nvim/                    ← LazyVim (symlink live: lazy-lock.json resta scrivibile)
       noctalia/palettes/       ← Tokyo Night Storm, varianti dark e light
-      dms/                     ← archivio della vecchia shell, non installato né avviato
       cava/config              ← il gradiente
       fastfetch/               ← config.jsonc + images/ (le immagini del logo vanno qui)
       gtk/Tokyo-Night/         ← il tema GTK di HyDE (Tokyonight-Storm): nautilus & co.
@@ -372,16 +371,18 @@ Il layout di control center e notifiche è quello di Noctalia, non una
 copia pixel-per-pixel di DMS; i colori Storm e il font restano coerenti.
 Al primo accesso scegli wallpaper e località meteo dalla GUI: erano
 nello stato locale di DMS, non nei file versionati. La vecchia cronologia
-clipboard/notepad non viene importata né cancellata. `dotfiles/dms/`
-rimane un archivio non installato, utile anche per tornare indietro.
+clipboard/notepad non viene importata né cancellata. La vecchia config
+DMS è nella storia git (fino al commit `66176da`), se mai servisse tornare indietro.
 
 **Applicare la migrazione.** Sul PC interessato, dopo aver sincronizzato
 il repo e tracciato i nuovi file, usa `nixup apply` oppure il normale
 `sudo nixos-rebuild switch --flake ~/nixos-config#armoredcoreVIP`
 (`#armoredcoreVIF` sul fisso). Salva il lavoro ed esci/rientra nella
 sessione: non avviare DMS e Noctalia insieme. SDDM e niri restano gli stessi.
-La patch IPC locale richiede la compilazione di Noctalia al primo rebuild;
-la cache upstream resta utile per le dipendenze, non per il binario patchato.
+Noctalia ha una patch IPC locale e segue il nixpkgs del sistema
+(`inputs.nixpkgs.follows`), quindi si compila in locale: al primo rebuild e
+quando un aggiornamento di nixpkgs ne cambia le dipendenze. In cambio glibc
+e PAM sono quelli del sistema, e il lockscreen carica i moduli PAM di NixOS.
 
 Prima di considerare concluso il passaggio sul portatile, prova `Mod+L`
 e lo sblocco, sospensione/ripresa e coperchio, i tasti multimediali,
@@ -397,6 +398,32 @@ Gli indici numerici degli altri workspace possono cambiare.
 - `Mod+Alt+S`: invia la colonna a `scratch` senza seguirla;
 - `Mod+Ctrl+S`: raggiunge `scratch`;
 - `Mod+S`: conserva l'overview.
+
+**Niri: touchpad come sul MacBook.** Solo il portatile ha un touchpad,
+quindi il blocco `touchpad` di `config.kdl` vale di fatto solo lì:
+
+- scrolling naturale: il contenuto segue le dita, e niri inverte di
+  conseguenza anche gli swipe a 3 dita (colonne e workspace seguono le dita);
+- tocco = click, tocco a due dita = destro, a tre = centrale;
+- premere il pad con due dita = click destro ovunque
+  (`click-method "clickfinger"`, niente zone-pulsante in basso);
+- pinch-to-zoom e indietro/avanti con due dita nelle app che li supportano
+  (Firefox e LibreWolf sì).
+
+Cosa niri non permette di rimappare (le gesture sono fisse nel compositor):
+lo swipe orizzontale a 3 dita scorre le colonne invece di cambiare Space,
+quello verticale cambia workspace (in niri i workspace sono verticali);
+l'overview, il "Mission Control", è lo swipe verticale a **4** dita; niente
+"trascina con tre dita", che litigherebbe con gli swipe a 3 dita. Gli hot
+corner sono spenti: quello di default era sopra il launcher di Noctalia.
+
+**Niri: tastiera e volume.** Sul portatile niri ha `it` + `us` e `Mod+K`
+alterna; SDDM e console restano solo `it`, il fisso ha solo `us`.
+`host.kdl` è incluso **in fondo** a `config.kdl`: in niri un blocco come
+`xkb` o `touchpad` scritto dopo sostituisce per intero quello precedente,
+quindi l'host deve venire per ultimo (lo verifica `nix flake check`).
+Il volume è su `Alt+F11`/`Alt+F12` (muto `Alt+F10`): F11 e F12 da soli
+restano alle app (fullscreen e devtools). I tasti volume dedicati non cambiano.
 
 **Niri: modalità gaming.** `Mod+Alt+G` carica alternativamente la config
 gaming e quella normale. Lo stato è in `XDG_RUNTIME_DIR/niri-gamemode/`,
@@ -424,6 +451,26 @@ il flag in `host.kdl`, incluso sia dalla config normale sia dalla gaming;
 `nix flake check` valida anche la variante con workaround attivo. Per
 disabilitarlo, ricommenta la riga e fai rebuild. Esci e rientra nella
 sessione per applicare il cambio dell'ambiente e del flag di debug.
+
+**Niri/NVIDIA: VRAM e sospensione.** Il driver non restituisce al pool la
+VRAM liberata dai compositor Wayland e ha un profilo correttivo per
+Hyprland, kwin, mutter e wlroots, ma non per niri: `hosts/armoredcoreVIF`
+aggiunge quello della wiki di niri (`GLVidHeapReuseRatio 0`). Con `nvtop`
+niri dovrebbe stare intorno ai 100 MiB, non verso 1 GiB.
+`hardware.nvidia.powerManagement.enable` salva la VRAM prima della
+sospensione, così al resume le finestre non tornano nere. `GBM_BACKEND` e
+`__GLX_VENDOR_LIBRARY_NAME` non sono più impostate: con i driver recenti
+non servono. Se un'app lo richiede davvero, rimettile in quel file.
+
+**Docker.** `dockerd` non parte al boot: lo avvia il socket al primo
+comando `docker` (i container `--restart=always` quindi non ripartono da
+soli dopo un riavvio). Le porte pubblicate con `-p 8080:80` ascoltano solo
+su `127.0.0.1`, perché Docker scrive regole iptables proprie che scavalcano
+il firewall di NixOS. Per esporre davvero una porta alla rete:
+`-p 0.0.0.0:8080:80`.
+
+**Firmware.** `services.fwupd` è attivo: `fwupdmgr refresh`,
+`fwupdmgr get-updates`, `fwupdmgr update` (BIOS/EC del T470s, SSD, periferiche).
 
 **Font: Monaspace Argon.** `pkgs.monaspace` è già installato a sistema.
 Il nome della famiglia per GTK, Qt, Noctalia e SDDM è `Monaspace Argon`;
@@ -668,7 +715,8 @@ ma l'IP va messo a mano: `sudo ip addr add 192.168.1.77/24 dev wlp58s0`,
 Nel sistema installato non serve fare nulla: `hosts/armoredcoreVIP` dichiara
 `services.xserver.xkb.layout = "it"` e da lì lo prendono SDDM, la console
 e niri (che riceve un `host.kdl` generato: `config.kdl` è condiviso col
-fisso, che è US). Vuoi entrambi con Mod+K per ciclare? `"it,us"`.
+fisso, che è US). In niri il portatile ha anche `us` come secondo layout,
+su `Mod+K`.
 
 **3. Partizioni.** Il T470s ha un NVMe: `lsblk` per confermare il nome
 (`/dev/nvme0n1`). Schema semplice, niente swap (c'è zram), le LABEL sono

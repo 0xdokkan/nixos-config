@@ -24,8 +24,8 @@ SHELL_BINDINGS = {
     "Mod+Shift+N": ("notification-clear-active",),
     "Mod+Ctrl+N": ("notification-dnd-toggle",),
     "Alt+F10": ("volume-mute",),
-    "F11": ("volume-down", "5"),
-    "F12": ("volume-up", "5"),
+    "Alt+F11": ("volume-down", "5"),
+    "Alt+F12": ("volume-up", "5"),
     "XF86AudioMute": ("volume-mute",),
     "XF86AudioLowerVolume": ("volume-down", "5"),
     "XF86AudioRaiseVolume": ("volume-up", "5"),
@@ -145,8 +145,10 @@ def check(path: Path) -> None:
         assert bindings.get(key, "").strip().rstrip(";") == expected, (
             f"{path}: {key} no longer calls {expected}"
         )
-    for key in ("Alt+F10", "F11", "F12", "XF86AudioMicMute"):
+    for key in ("Alt+F10", "Alt+F11", "Alt+F12", "XF86AudioMicMute"):
         assert "allow-when-locked=true" in headers[key]
+    # F11/F12 da soli restano alle app (fullscreen, devtools).
+    assert "F11" not in bindings and "F12" not in bindings
     for key in bindings:
         if key.startswith("XF86"):
             assert "allow-when-locked=true" in headers[key]
@@ -158,7 +160,29 @@ def check(path: Path) -> None:
     assert 'focus-workspace "scratch"' in bindings["Mod+Ctrl+S"]
     assert "toggle-overview" in bindings["Mod+S"]
     assert not re.search(r"move-column-to-workspace\s+99\b", text)
-    print(f"{path}: Noctalia privacy, IPC bindings and scratch checks passed")
+
+    # In niri `xkb` e `touchpad` non si fondono campo per campo: un blocco
+    # successivo sostituisce per intero il precedente. host.kdl deve quindi
+    # essere l'ultima cosa del file e qui non deve esserci nessun xkb, o il
+    # layout dell'host verrebbe azzerato (ricadendo in silenzio su localed).
+    assert text.rstrip().endswith('include "host.kdl"'), (
+        f"{path}: host.kdl must be included at the very end"
+    )
+    assert len(re.findall(r'^include "host\.kdl"\s*$', text, re.M)) == 1
+    assert not re.search(r"^\s*xkb\b", text, re.M), f"{path}: xkb belongs in host.kdl"
+
+    # Touchpad stile MacBook (solo il portatile ne ha uno).
+    touchpads = re.findall(r"(?ms)^    touchpad \{\n(.*?)^    \}", text)
+    assert len(touchpads) == 1, f"{path}: expected one touchpad block"
+    touchpad = {line.strip() for line in touchpads[0].splitlines() if line.strip()}
+    for setting in ("tap", "dwt", "natural-scroll", 'click-method "clickfinger"'):
+        assert setting in touchpad, f"{path}: touchpad lost {setting}"
+
+    # Hot corner spenti: quello di default è sopra il launcher di Noctalia.
+    assert re.search(r"(?ms)^gestures \{\s*hot-corners \{\s*off\s*\}\s*\}", text), (
+        f"{path}: hot corners must be off"
+    )
+    print(f"{path}: Noctalia privacy, IPC bindings, scratch and input checks passed")
 
 
 if __name__ == "__main__":

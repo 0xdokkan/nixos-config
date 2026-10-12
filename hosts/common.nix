@@ -41,10 +41,11 @@ in
   nixpkgs.config.allowUnfree = true;   # discord, steam, obsidian, claude-code, nvidia...
   # Cache pubblicata da Numtide per llm-agents: evita di compilare Codex.
   # È una fonte di binari fidata aggiuntiva, con verifica della firma.
-  nix.settings.extra-substituters = [ "https://cache.numtide.com" "https://noctalia.cachix.org" ];
+  # (Niente cache di Noctalia: il pacchetto è patchato e usa il nostro
+  #  nixpkgs, quindi lì non ci sarebbe mai.)
+  nix.settings.extra-substituters = [ "https://cache.numtide.com" ];
   nix.settings.extra-trusted-public-keys = [
     "niks3.numtide.com-1:DTx8wZduET09hRmMtKdQDxNNthLQETkc/yaX7M4qK0g="
-    "noctalia.cachix.org-1:pCOR47nnMEo5thcxNDtzWpOxNFQsBRglJzxWPp3dkU4="
   ];
 
   # ══ Pulizia automatica dello store ══════════════════════════════════
@@ -164,6 +165,14 @@ in
     GDK_SCALE = "1";
   };
 
+  # Le app con Terminal=true nel .desktop (nvim.desktop, htop...) aperte
+  # da Nautilus/xdg-open: GLib non conosce kitty e cerca prima
+  # xdg-terminal-exec. Senza, "apri con nvim" non trova un terminale.
+  xdg.terminal-exec = {
+    enable = true;
+    settings.default = [ "kitty.desktop" ];
+  };
+
   environment.systemPackages = with pkgs; [
     xwayland-satellite   # X11 apps dentro niri
     vim
@@ -195,7 +204,16 @@ in
   programs.steam.enable = true;
 
   # ══ Container e VM ══════════════════════════════════════════════════
-  virtualisation.docker.enable = true;
+  virtualisation.docker = {
+    enable = true;
+    # dockerd parte via socket al primo comando `docker`, non a ogni boot.
+    # (I container con --restart=always però non ripartono da soli al boot.)
+    enableOnBoot = false;
+    # Le porte pubblicate (-p 8080:80) scrivono regole iptables proprie e
+    # scavalcano il firewall di NixOS: di default ascoltano solo in locale.
+    # Per esporne una alla rete apposta: -p 0.0.0.0:8080:80
+    daemon.settings.ip = "127.0.0.1";
+  };
   virtualisation.libvirtd.enable = true;
   programs.virt-manager.enable = true;   # la GUI; la connessione è in home/
 
@@ -205,8 +223,11 @@ in
     gui.enable = true;   # il default è solo daemon + CLI
   };
 
-  # ══ Salute del disco ════════════════════════════════════════════════
+  # ══ Salute del disco e firmware ═════════════════════════════════════
   services.smartd.enable = true;
+  # Aggiornamenti firmware da LVFS (BIOS/EC del T470s, SSD, periferiche):
+  #   fwupdmgr refresh && fwupdmgr get-updates && fwupdmgr update
+  services.fwupd.enable = true;
 
   # ══ Il salva-CTF: i binari FHS scaricati partono 🚩 ═════════════════
   programs.nix-ld.enable = true;

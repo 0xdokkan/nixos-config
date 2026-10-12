@@ -9,10 +9,10 @@
 #
 # Le config stanno nella stessa directory dello store perché si includono
 # a vicenda con path relativi:
-#   config-gaming.kdl → include "config.kdl" → include "host.kdl"
+#   config-gaming.kdl → include "config.kdl" → include "host.kdl" (in fondo)
 #
-# host.kdl contiene il layout dichiarato in services.xserver.xkb.layout
-# (US sul fisso, IT sul portatile) e l'eventuale workaround del cursore.
+# host.kdl contiene il layout per niri (us sul fisso, it,us sul portatile:
+# lo calcola home/desktop.nix) e l'eventuale workaround del cursore.
 # disableCursorPlane è opt-in: niente cursore software forzato per default.
 { pkgs, layout ? "us", disableCursorPlane ? false }:
 
@@ -22,7 +22,8 @@ pkgs.runCommand "niri-config-checked"
   cp ${../dotfiles/niri/config.kdl}        $out/config.kdl
   cp ${../dotfiles/niri/config-gaming.kdl} $out/config-gaming.kdl
   cat > $out/host.kdl <<EOF
-  // GENERATO da home/niri-configs.nix — layout = services.xserver.xkb.layout dell'host
+  // GENERATO da home/niri-configs.nix — layout dall'host (vedi home/desktop.nix)
+  // Incluso in FONDO a config.kdl: questi blocchi sostituiscono quelli condivisi.
   input {
       keyboard {
           xkb {

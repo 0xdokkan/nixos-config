@@ -15,7 +15,8 @@
   # ══ Tastiera italiana ═══════════════════════════════════════════════
   # Unica fonte di verità per il layout: la leggono SDDM, la console
   # (console.useXkbConfig in common.nix) e niri (home/niri-configs.nix
-  # genera host.kdl da qui). Con "it,us" Mod+K cicla tra i due.
+  # genera host.kdl da qui). Solo in niri si aggiunge "us" come secondo
+  # layout (home/desktop.nix): Mod+K alterna it/us.
   services.xserver.xkb.layout = "it";
 
   # ══ CPU ═════════════════════════════════════════════════════════════

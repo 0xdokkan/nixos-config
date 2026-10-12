@@ -1,4 +1,4 @@
-{ config, osConfig, pkgs, ... }:
+{ config, lib, osConfig, pkgs, ... }:
 
 let
   desktopFont = "Monaspace Argon";
@@ -11,9 +11,12 @@ let
   # ══ niri: config.kdl + config-gaming.kdl + host.kdl validati a BUILD-TIME ══
   # (la derivazione è in niri-configs.nix: la usa anche `checks` nel flake)
   # osConfig = la config NixOS dell'host: da lì arriva il layout tastiera.
+  # Sul portatile niri aggiunge "us" come secondo layout (Mod+K alterna);
+  # SDDM e la console restano sul solo layout dichiarato dall'host.
   niriConfigs = import ./niri-configs.nix {
     inherit pkgs;
-    layout = osConfig.services.xserver.xkb.layout;
+    layout = osConfig.services.xserver.xkb.layout
+      + lib.optionalString (osConfig.networking.hostName == "armoredcoreVIP") ",us";
     # Workaround opzionale per bug del cursore NVIDIA: scommenta SOLO se
     # necessario. Il confronto evita di applicarlo al portatile Intel.
     # disableCursorPlane = osConfig.networking.hostName == "armoredcoreVIF";
@@ -160,9 +163,9 @@ in
     gtk.enable = true;
   };
 
-  # Noctalia: configurazione e palette in home/noctalia.nix. I vecchi
-  # dotfiles/dms restano come archivio di migrazione, non vengono linkati.
-  # Non cancelliamo lo stato DMS locale (wallpaper, notepad, cronologia).
+  # Noctalia: configurazione e palette in home/noctalia.nix. La vecchia
+  # config DMS è nella storia git (fino al commit 66176da); lo stato DMS
+  # locale (wallpaper, notepad, cronologia) non viene cancellato.
 
   # Helium (input helium-flake nel flake.nix, modulo HM in sharedModules).
   # Il wrapper aggiunge da solo --ozone-platform-hint=auto quando vede

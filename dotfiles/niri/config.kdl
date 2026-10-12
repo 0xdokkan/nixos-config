@@ -15,12 +15,6 @@
 // ╚══════════════════════════════════════════════════════════════════════╝
 
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// PER-HOST — generato da nix nella stessa cartella (layout tastiera)
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-include "host.kdl"
-
 // Un workspace nominato resta disponibile anche quando è vuoto.
 // È visibile nella barra/overview: NON è uno "special" nascosto di Hyprland.
 // Gli altri workspace restano dinamici; i loro indici possono cambiare.
@@ -33,30 +27,33 @@ workspace "scratch"
 
 input {
     keyboard {
-        xkb {
-            // Il layout NON è qui: questo file è condiviso tra fisso (US)
-            // e armoredcoreVIP (IT). Sta in host.kdl, generato da home-manager
-            // dal valore di services.xserver.xkb.layout dell'host
-            // (vedi home/niri-configs.nix). Con "it,us" keyboardswitch.sh
-            // (Mod+K) cicla tra i due.
-        }
+        // Niente blocco xkb qui: il layout sta in host.kdl, generato da
+        // home-manager per ogni host (vedi home/niri-configs.nix e
+        // l'include in fondo al file). Un `xkb { }` anche vuoto in questo
+        // file sostituirebbe per intero quello dell'host.
         // Equivalente di numlock_by_default = true
         numlock
         repeat-delay 600
         repeat-rate 25
     }
 
+    // Touchpad come sul MacBook. Ce l'ha solo il portatile: sul fisso
+    // questo blocco non tocca nulla (il mouse è nel blocco sotto).
     touchpad {
-        // tap-to-click
+        // tocco = click; due dita = destro, tre = centrale
+        // (tap-button-map "left-right-middle" è il default di libinput)
         tap
-        // dwt (disable while typing) — equivalente al comportamento HyDE
+        // disable while typing: il "palm rejection" del Mac
         dwt
-        // hyprland aveva natural_scroll = no
-        // (niri di default usa natural-scroll, lo lasciamo OFF per parità)
-        // natural-scroll
+        // scrolling naturale: il contenuto segue le dita. niri inverte
+        // anche gli swipe a 3 dita, quindi workspace e colonne seguono
+        // le dita come gli Spaces.
+        natural-scroll
+        // click premendo il pad: con due dita = destro, ovunque sul pad,
+        // invece delle zone-pulsante in basso
+        click-method "clickfinger"
         accel-speed 0.0
         accel-profile "adaptive"
-        // tap-button-map "left-right-middle"
     }
 
     mouse {
@@ -69,7 +66,7 @@ input {
     // In niri il focus-on-hover è opt-in:
     // focus-follows-mouse max-scroll-amount="0%"
 
-    // Niente warp del mouse al cambio workspace
+    // Ripremere il bind del workspace già attivo torna al precedente
     workspace-auto-back-and-forth
 
     // touchpad gestures: niri ha già swipe a 3 dita built-in.
@@ -159,9 +156,18 @@ cursor {
     hide-after-inactive-ms 2000
 }
 
-// Hot corners disattivati per evitare attivazioni accidentali dell'overview
+// Niente overlay dei tasti all'avvio: resta su Mod+Shift+Slash
 hotkey-overlay {
     skip-at-startup
+}
+
+// Hot corner spenti: quello in alto a sinistra (default di niri) è
+// proprio sul launcher di Noctalia e apriva l'overview per sbaglio.
+// L'overview resta su Mod+S e sullo swipe a 4 dita.
+gestures {
+    hot-corners {
+        off
+    }
 }
 
 
@@ -278,32 +284,8 @@ window-rule {
 // --- Browser e editor ---
 window-rule {
     match app-id="firefox"
+    match app-id="librewolf"
     opacity 0.90
-    background-effect { blur true; }
-}
-window-rule {
-    match app-id="^[Bb]rave-browser$"
-    opacity 0.90
-    background-effect { blur true; }
-}
-window-rule {
-    match app-id="code-oss"
-    opacity 0.80
-    background-effect { blur true; }
-}
-window-rule {
-    match app-id="^[Cc]ode$"
-    opacity 0.80
-    background-effect { blur true; }
-}
-window-rule {
-    match app-id="code-url-handler"
-    opacity 0.80
-    background-effect { blur true; }
-}
-window-rule {
-    match app-id="code-insiders-url-handler"
-    opacity 0.80
     background-effect { blur true; }
 }
 
@@ -326,11 +308,6 @@ window-rule {
     open-floating true
 }
 window-rule {
-    match app-id="nwg-look"
-    opacity 0.80
-    open-floating true
-}
-window-rule {
     match app-id="qt5ct"
     opacity 0.80
     open-floating true
@@ -341,22 +318,7 @@ window-rule {
     open-floating true
 }
 window-rule {
-    match app-id="kvantummanager"
-    opacity 0.80
-    open-floating true
-}
-window-rule {
     match app-id="org.pulseaudio.pavucontrol"
-    opacity 0.75
-    open-floating true
-}
-window-rule {
-    match app-id="blueman-manager"
-    opacity 0.75
-    open-floating true
-}
-window-rule {
-    match app-id="nm-applet"
     opacity 0.75
     open-floating true
 }
@@ -366,16 +328,7 @@ window-rule {
     open-floating true
 }
 
-// --- Polkit & portali ---
-window-rule {
-    match app-id="org.kde.polkit-kde-authentication-agent-1"
-    opacity 0.75
-    open-floating true
-}
-window-rule {
-    match app-id="polkit-gnome-authentication-agent-1"
-    opacity 0.75
-}
+// --- Portali (il polkit è un pannello Noctalia, non una finestra) ---
 window-rule {
     match app-id="org.freedesktop.impl.portal.desktop.gtk"
     opacity 0.75
@@ -491,10 +444,12 @@ window-rule {
 }
 window-rule {
     match app-id="firefox" title="^Picture-in-Picture$"
+    match app-id="librewolf" title="^Picture-in-Picture$"
     open-floating true
 }
 window-rule {
     match app-id="firefox" title="^Library$"
+    match app-id="librewolf" title="^Library$"
     open-floating true
 }
 window-rule {
@@ -565,11 +520,7 @@ window-rule {
 // Noctalia richiede il blur tramite il protocollo ext-background-effect.
 // I namespace sono controllati contro i sorgenti della versione nel lock.
 
-// Shadow sotto la bar e il dock
-layer-rule {
-    match namespace="^noctalia-bar-.*$"
-}
-
+// Ombra sotto il dock (la barra resta senza)
 layer-rule {
     match namespace="^noctalia-dock$"
     shadow {
@@ -701,10 +652,12 @@ binds {
     Alt+F10 allow-when-locked=true {
         spawn "noctalia" "msg" "volume-mute"
     }
-    F11 allow-when-locked=true {
+    // Con Alt, come il muto: F11/F12 da soli restano alle app
+    // (fullscreen e devtools nel browser)
+    Alt+F11 allow-when-locked=true {
         spawn "noctalia" "msg" "volume-down" "5"
     }
-    F12 allow-when-locked=true {
+    Alt+F12 allow-when-locked=true {
         spawn "noctalia" "msg" "volume-up" "5"
     }
     XF86AudioMute allow-when-locked=true {
@@ -852,7 +805,7 @@ binds {
     // Mod+MouseLeft  = move (built-in in niri, niente bind)
     // Mod+MouseRight = resize (built-in in niri, niente bind)
     Mod+Z hotkey-overlay-title="Move floating" { toggle-window-floating; }
-    Mod+X hotkey-overlay-title="Reset col width" { reset-window-height; }
+    Mod+X hotkey-overlay-title="Reset window height" { reset-window-height; }
 
     // ───── Scratch nominato (non uno special workspace nascosto) ─────
     // Super+S → overview; Super+Alt+S → invia la colonna senza seguirla;
@@ -958,3 +911,13 @@ layer-rule {
 // ║   • opacity dynamic via hyprctl reload → niri ricarica auto su file   ║
 // ║     change, gli script wallbash possono solo riscrivere config.kdl.   ║
 // ╚══════════════════════════════════════════════════════════════════════╝
+
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// PER-HOST — generato da nix nella stessa cartella (layout tastiera,
+// eventuale workaround del cursore). DEVE restare in fondo: in niri gli
+// include sono posizionali e un blocco come `xkb` o `touchpad` scritto
+// dopo sostituisce per intero quello precedente. Così vince l'host.
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+include "host.kdl"
