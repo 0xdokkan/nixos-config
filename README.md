@@ -308,8 +308,12 @@ affiancano in orizzontale e lo schermo scorre: le nuove nascono a metà
 larghezza, `Mod+R` cicla 1/3, 1/2, 2/3 e tutto, `Mod+Shift+←/→` ridimensiona,
 `Mod+.`/`Mod+,` impila nella colonna accanto (su/giù per muoversi nella
 pila). I tag sono 10 (`Mod+1..0`), visibili tutti nella barra; ripremere
-il tag corrente torna al precedente. `Mod+S` è l'overview, `Mod+G` unisce
-la finestra a quella a destra in un gruppo a schede.
+il tag corrente torna al precedente. `Mod+G` unisce la finestra a quella
+a destra in un gruppo a schede.
+
+`Mod+S` (o lo swipe a 4 dita) apre l'overview: le finestre di tutti i tag
+rimpicciolite in una griglia, stile Exposé (`ov_tab_mode=0`). Click
+sinistro va alla finestra, destro la chiude; `Mod+S` di nuovo esce.
 
 Una finestra da sola in un tag prende tutta la larghezza e, finché resta
 sola, `Mod+R` e il ridimensionamento non fanno nulla: è come funziona

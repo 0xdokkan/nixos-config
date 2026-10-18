@@ -135,6 +135,27 @@ pkgs.testers.runNixOSTest {
     user("swaync-client -cp -sw")
     machine.sleep(1)
 
+    # Overview (Mod+S): quattro finestre su tre tag.
+    user("mmsg dispatch view,2")
+    user("kitty -e top >/dev/null 2>&1 &")
+    machine.sleep(3)
+    user("mmsg dispatch view,3")
+    user("kitty >/dev/null 2>&1 &")
+    machine.sleep(3)
+    user("mmsg dispatch view,1")
+    machine.sleep(1)
+
+    user("mmsg dispatch toggleoverview")
+    machine.sleep(2)
+    machine.screenshot("7-overview")
+    # Lo stesso comando la richiude (ov_tab_mode=0): dopo, nessun client
+    # deve avere più la geometria rimpicciolita della overview.
+    user("mmsg dispatch toggleoverview")
+    machine.sleep(2)
+    machine.screenshot("8-dopo-overview")
+    tag1 = [c for c in clients()["clients"] if 1 in c["tags"]]
+    assert len(tag1) == 2 and all(c["width"] > 500 for c in tag1), tag1
+
     # hyprlock: si blocca, poi la password vera (PAM) sblocca.
     user("hyprlock > /tmp/hyprlock.log 2>&1 &")
     machine.wait_until_succeeds("grep -q 'onLockLocked called' /tmp/hyprlock.log", timeout=30)

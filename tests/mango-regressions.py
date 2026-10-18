@@ -167,6 +167,8 @@ def check_dir(directory, layout):
         "trackpad_natural_scrolling": "1", "trackpad_click_method": "2",
         "mouse_accel_profile": "1", "enable_hotarea": "0",
         "numlockon": "1", "repeat_delay": "600", "repeat_rate": "25",
+        # Mod+S and the 4-finger swipe must close the overview, not cycle.
+        "ov_tab_mode": "0",
     }.items():
         assert config.get(key) == [value], f"config.conf: {key}={config.get(key)}"
 
