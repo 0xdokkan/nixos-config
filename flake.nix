@@ -43,7 +43,15 @@
   outputs = { self, nixpkgs, home-manager, nix-index-database, helium-flake, llm-agents, ... }:
     let
       system = "x86_64-linux";
-      pkgs = nixpkgs.legacyPackages.${system};
+      # mango con l'overview a carosello (patches/mango-overview-carousel.patch).
+      # Lo stesso overlay vale per i sistemi (nixpkgs.overlays, e quindi
+      # anche per home-manager con useGlobalPkgs) e per check e anteprima.
+      mangoOverlay = final: prev: {
+        mango = prev.mango.overrideAttrs (old: {
+          patches = (old.patches or [ ]) ++ [ ./patches/mango-overview-carousel.patch ];
+        });
+      };
+      pkgs = nixpkgs.legacyPackages.${system}.extend mangoOverlay;
       # le devshell dei template sono funzioni { pkgs } → mkShell:
       # le stesse identiche shell le esponiamo anche qui per uso "scratch"
       shell = name: import ./templates/${name}/shell.nix { inherit pkgs; };
@@ -54,6 +62,7 @@
         inherit system;
         modules = [
           ./hosts/${name}/configuration.nix
+          { nixpkgs.overlays = [ mangoOverlay ]; }
 
           # home-manager come modulo NixOS: sistema e home si buildano
           # e switchano INSIEME, atomicamente, in un solo comando

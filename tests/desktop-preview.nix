@@ -145,14 +145,54 @@ pkgs.testers.runNixOSTest {
     user("mmsg dispatch view,1")
     machine.sleep(1)
 
+    # Il carosello (ov_carousel, dalla patch): una fila centrata in
+    # verticale, la finestra a fuoco grande in mezzo allo schermo.
+    def monitor():
+        return json.loads(user("mmsg get all-monitors"))["monitors"][0]
+
+    def carousel():
+        m = monitor()
+        cs = clients()["clients"]
+        assert len(cs) == 4, cs
+        mids = {round(c["y"] + c["height"] / 2) for c in cs}
+        assert max(mids) - min(mids) <= 2, cs
+        f = [c for c in cs if c["id"] == m["active_client"]["id"]][0]
+        assert abs(f["x"] + f["width"] / 2 - (m["x"] + m["width"] / 2)) <= 2, (m, f)
+        assert all(c["height"] < f["height"] for c in cs if c is not f), cs
+        # Tutte dentro lo schermo, senza sovrapporsi.
+        row = sorted(cs, key=lambda c: c["x"])
+        assert row[0]["x"] >= m["x"] and row[-1]["x"] + row[-1]["width"] <= m["x"] + m["width"], row
+        assert all(a["x"] + a["width"] < b["x"] for a, b in zip(row, row[1:])), row
+        return f["id"]
+
     user("mmsg dispatch toggleoverview")
     machine.sleep(2)
     machine.screenshot("7-overview")
-    # Lo stesso comando la richiude (ov_tab_mode=0): dopo, nessun client
-    # deve avere più la geometria rimpicciolita della overview.
-    user("mmsg dispatch toggleoverview")
+    first = carousel()
+    # Mod+→ (focusdir) e la freccia da sola fanno girare l'anello...
+    user("mmsg dispatch focusdir,right")
+    machine.sleep(2)
+    machine.screenshot("7b-overview-girata")
+    second = carousel()
+    assert second != first
+    machine.send_key("right")
+    machine.sleep(2)
+    assert carousel() not in (first, second)
+    machine.send_key("left")
+    machine.sleep(2)
+    assert carousel() == second
+    # ...e Invio chiude sulla finestra al centro, nel suo tag.
+    machine.send_key("ret")
     machine.sleep(2)
     machine.screenshot("8-dopo-overview")
+    assert monitor()["active_client"]["id"] == second
+    cs = clients()["clients"]
+    chosen = [c for c in cs if c["id"] == second][0]
+    assert chosen["is_visible"], cs
+    assert all(not c["is_visible"] for c in cs if c["tags"] != chosen["tags"]), cs
+    # Dopo nessun client deve avere più la geometria della overview.
+    user("mmsg dispatch view,1")
+    machine.sleep(2)
     tag1 = [c for c in clients()["clients"] if 1 in c["tags"]]
     assert len(tag1) == 2 and all(c["width"] > 500 for c in tag1), tag1
 

@@ -1,0 +1,350 @@
+Overview "a carosello" (cover flow) per mango: nuova opzione ov_carousel=1.
+
+Una fila sola, centrata in verticale: la finestra a fuoco grande in mezzo,
+le altre sempre più piccole verso i lati. La fila è un anello: frecce
+(con o senza Mod), lo swipe a 3 dita (focusdir) e focusstack la fanno
+girare; Invio, Esc o il click chiudono l'overview sulla finestra scelta.
+L'ordine è per tag e poi per posizione sul tag, non per ultimo focus.
+Con ov_tab_mode=0 Mod+S apre e chiude; con ov_tab_mode=1 diventa un
+alt-tab a carosello (Mod+S gira, rilasciare Mod sceglie).
+
+Scritta per mango 0.16.2 (flake.nix → mangoOverlay). Se un aggiornamento
+di nixpkgs la rompe, `nix flake check` fallisce su mango-config.
+mango 0.18 ha spostato il codice in src/*.c + include/ e rinominato quasi
+tutte le opzioni (gappih, windowrule, exec-once, ov_tab_mode...): a quel
+punto va riportata insieme alla migrazione della config.
+
+diff --git a/src/config/parse_config.h b/src/config/parse_config.h
+index 74ddcc2..dd8e47e 100644
+--- a/src/config/parse_config.h
++++ b/src/config/parse_config.h
+@@ -352,6 +352,7 @@ typedef struct {
+ 	int32_t enable_hotarea;
+ 	int32_t ov_tab_mode;
+ 	int32_t ov_tab_mode_launch_next;
++	int32_t ov_carousel;
+ 
+ 	int32_t overviewgappi;
+ 	int32_t overviewgappo;
+@@ -1955,6 +1956,8 @@ bool parse_option(Config *config, char *key, char *value, int line_number) {
+ 		config->ov_tab_mode = atoi(value);
+ 	} else if (strcmp(key, "ov_tab_mode_launch_next") == 0) {
+ 		config->ov_tab_mode_launch_next = atoi(value);
++	} else if (strcmp(key, "ov_carousel") == 0) {
++		config->ov_carousel = atoi(value);
+ 	} else if (strcmp(key, "overviewgappi") == 0) {
+ 		config->overviewgappi = atoi(value);
+ 	} else if (strcmp(key, "overviewgappo") == 0) {
+@@ -4257,6 +4260,7 @@ void override_config(void) {
+ 	config.ov_tab_mode = CLAMP_INT(config.ov_tab_mode, 0, 1);
+ 	config.ov_tab_mode_launch_next =
+ 		CLAMP_INT(config.ov_tab_mode_launch_next, 0, 1);
++	config.ov_carousel = CLAMP_INT(config.ov_carousel, 0, 1);
+ 	config.overviewgappi = CLAMP_INT(config.overviewgappi, 0, 1000);
+ 	config.overviewgappo = CLAMP_INT(config.overviewgappo, 0, 1000);
+ 	config.xwayland_persistence = CLAMP_INT(config.xwayland_persistence, 0, 1);
+@@ -4452,6 +4456,7 @@ void set_value_default() {
+ 	config.capslock = 0;
+ 	config.ov_tab_mode = 1;
+ 	config.ov_tab_mode_launch_next = 0;
++	config.ov_carousel = 0;
+ 	config.hotarea_size = 10;
+ 	config.hotarea_corner = BOTTOM_LEFT;
+ 	config.enable_hotarea = 0;
+diff --git a/src/dispatch/bind_define.h b/src/dispatch/bind_define.h
+index 0322148..a7e9505 100644
+--- a/src/dispatch/bind_define.h
++++ b/src/dispatch/bind_define.h
+@@ -138,6 +138,18 @@ void focusdir(const Arg *arg) {
+ 		return;
+ 
+ 	Client *c = NULL;
++
++	/* In the carousel left and right turn the ring. */
++	if (selmon->isoverview && config.ov_carousel && !selmon->is_jump_mode) {
++		if (arg->i == LEFT || arg->i == RIGHT)
++			c = overview_carousel_step(selmon, arg->i == RIGHT ? 1 : -1);
++		if (c) {
++			focusclient(c, 1);
++			arrange(selmon, true, false);
++		}
++		return;
++	}
++
+ 	c = direction_select(arg);
+ 
+ 	if (!selmon->isoverview)
+@@ -369,7 +381,11 @@ void focusstack(const Arg *arg) {
+ 
+ 	if (!sel)
+ 		return;
+-	if (arg->i == NEXT) {
++	bool carousel = selmon && selmon->isoverview && config.ov_carousel &&
++					!selmon->is_jump_mode;
++	if (carousel) {
++		tc = overview_carousel_step(selmon, arg->i == NEXT ? 1 : -1);
++	} else if (arg->i == NEXT) {
+ 		tc = get_next_stack_client(sel, false);
+ 	} else {
+ 		tc = get_next_stack_client(sel, true);
+@@ -381,6 +397,8 @@ void focusstack(const Arg *arg) {
+ 	focusclient(tc, 1);
+ 	if (config.warpcursor)
+ 		warp_cursor(tc);
++	if (carousel)
++		arrange(selmon, true, false);
+ 	return;
+ }
+ 
+diff --git a/src/input/keyboard.h b/src/input/keyboard.h
+index c0b66f3..78e9623 100644
+--- a/src/input/keyboard.h
++++ b/src/input/keyboard.h
+@@ -540,6 +540,26 @@ void keypress(struct wl_listener *listener, void *data) {
+ 	if (handled)
+ 		return;
+ 
++	if (selmon && selmon->isoverview && config.ov_carousel &&
++		!selmon->is_jump_mode && !locked &&
++		event->state == WL_KEYBOARD_KEY_STATE_PRESSED) {
++		for (i = 0; i < nsyms; i++) {
++			switch (syms[i]) {
++			case XKB_KEY_Left:
++				focusdir(&(Arg){.i = LEFT});
++				return;
++			case XKB_KEY_Right:
++				focusdir(&(Arg){.i = RIGHT});
++				return;
++			case XKB_KEY_Return:
++			case XKB_KEY_KP_Enter:
++			case XKB_KEY_Escape:
++				toggleoverview(&(Arg){.i = 1});
++				return;
++			}
++		}
++	}
++
+ 	if (selmon && selmon->is_jump_mode &&
+ 		event->state == WL_KEYBOARD_KEY_STATE_PRESSED) {
+ 		for (i = 0; i < nsyms; i++) {
+diff --git a/src/input/pointer.h b/src/input/pointer.h
+index f3f26c9..10f313e 100644
+--- a/src/input/pointer.h
++++ b/src/input/pointer.h
+@@ -1015,7 +1015,8 @@ void pointerfocus(Client *c, struct wlr_surface *surface, double sx, double sy,
+ 
+ 	if (config.sloppyfocus && !start_drag_window && c && time && c->scene &&
+ 		c->scene->node.enabled &&
+-		(!c->mon || !c->mon->isoverview || !config.ov_tab_mode) &&
++		(!c->mon || !c->mon->isoverview ||
++		 (!config.ov_tab_mode && !config.ov_carousel)) &&
+ 		!c->animation.tagining &&
+ 		(surface != seat->pointer_state.focused_surface ||
+ 		 (selmon && selmon->isoverview && selmon->sel != c)) &&
+diff --git a/src/layout/layout.h b/src/layout/layout.h
+index 1f82eea..ca8b21b 100644
+--- a/src/layout/layout.h
++++ b/src/layout/layout.h
+@@ -2,6 +2,7 @@ static void tile(Monitor *m);
+ static void center_tile(Monitor *m);
+ static void right_tile(Monitor *m);
+ static void overview(Monitor *m);
++static Client *overview_carousel_step(Monitor *m, int32_t dir);
+ static void grid(Monitor *m);
+ static void scroller(Monitor *m);
+ static void deck(Monitor *mon);
+diff --git a/src/layout/overview.h b/src/layout/overview.h
+index 8b2565c..d70fff8 100644
+--- a/src/layout/overview.h
++++ b/src/layout/overview.h
+@@ -493,8 +493,189 @@ void finish_jump_mode(Monitor *m) {
+ 	m->is_jump_mode = 0;
+ }
+ 
++/* ov_carousel: cover flow. One row, vertically centred: the focused window
++ * big in the middle, the others smaller and smaller towards the sides. The
++ * row is a ring, so moving the focus makes it turn. Windows are ordered by
++ * tag and then by their position on it, so the order does not depend on
++ * which window was focused last. */
++static int compare_carousel_items(const void *a, const void *b) {
++	const Client *ca = *(Client *const *)a;
++	const Client *cb = *(Client *const *)b;
++	int ta = ca->tags ? __builtin_ctz(ca->tags) : 32;
++	int tb = cb->tags ? __builtin_ctz(cb->tags) : 32;
++	if (ta != tb)
++		return ta < tb ? -1 : 1;
++	if (ca->overview_backup_geom.x != cb->overview_backup_geom.x)
++		return ca->overview_backup_geom.x < cb->overview_backup_geom.x ? -1
++																	   : 1;
++	if (ca->overview_backup_geom.y != cb->overview_backup_geom.y)
++		return ca->overview_backup_geom.y < cb->overview_backup_geom.y ? -1
++																	   : 1;
++	if (ca == cb)
++		return 0;
++	return (uintptr_t)ca < (uintptr_t)cb ? -1 : 1;
++}
++
++/* The windows in the row, in ring order, and the index of the focused one
++ * (0 if none is). The caller frees *out. */
++static int overview_carousel_items(Monitor *m, Client ***out, int *focus) {
++	*out = NULL;
++	*focus = 0;
++	if (m->visible_clients <= 0)
++		return 0;
++
++	Client **items = calloc(m->visible_clients, sizeof(Client *));
++	if (!items)
++		return 0;
++
++	int n = 0;
++	Client *c;
++	wl_list_for_each(c, &clients, link) {
++		if (n < (int)m->visible_clients && c->mon == m && VISIBLEON(c, m) &&
++			!c->isunglobal && !client_is_x11_popup(c))
++			items[n++] = c;
++	}
++	if (n == 0) {
++		free(items);
++		return 0;
++	}
++
++	qsort(items, n, sizeof(Client *), compare_carousel_items);
++	for (int i = 0; i < n; i++) {
++		if (items[i] == m->sel) {
++			*focus = i;
++			break;
++		}
++	}
++	*out = items;
++	return n;
++}
++
++/* The next window along the ring in direction dir (1 or -1), skipping the
++ * ones that do not take focus. */
++static Client *overview_carousel_step(Monitor *m, int32_t dir) {
++	Client **items;
++	int focus;
++	int n = overview_carousel_items(m, &items, &focus);
++	Client *c = NULL;
++	for (int k = 1; k < n && !c; k++) {
++		Client *next = items[((focus + dir * k) % n + n) % n];
++		if (!next->nofocus)
++			c = next;
++	}
++	free(items);
++	return c;
++}
++
++void overview_carousel(Monitor *m) {
++	const float center_h = 0.72f; /* of the usable height */
++	const float shrink = 0.72f;	  /* per step away from the centre */
++
++	Client **items;
++	int focus;
++	int n = overview_carousel_items(m, &items, &focus);
++	if (n == 0)
++		return;
++	/* Of the usable width: a wide middle window would leave the sides
++	 * too little room. */
++	float max_w = n > 1 ? 0.42f : 0.6f;
++
++	float edge = (float)config.overviewgappo;
++	float gap = (float)config.overviewgappi;
++	float avail_w = fmaxf(1.0f, m->w.width - 2.0f * edge);
++	float avail_h = fmaxf(1.0f, m->w.height - 2.0f * edge);
++
++	/* Slot p goes from -left_cnt (far left) to right_cnt (far right). */
++	int right_cnt = n / 2;
++	int left_cnt = n - 1 - right_cnt;
++	float *ws = calloc(n, sizeof(float));
++	float *hs = calloc(n, sizeof(float));
++	if (!ws || !hs) {
++		free(items);
++		free(ws);
++		free(hs);
++		return;
++	}
++
++	float side_w[2] = {0.0f, 0.0f}; /* left, right */
++	for (int p = -left_cnt; p <= right_cnt; p++) {
++		Client *c = items[((focus + p) % n + n) % n];
++		float ow = c->overview_backup_geom.width;
++		float oh = c->overview_backup_geom.height;
++		if (ow <= 0 || oh <= 0) {
++			ow = 100.0f;
++			oh = 100.0f;
++		}
++		float k = powf(shrink, (float)abs(p));
++		float h = avail_h * center_h * k;
++		float w = h * (ow / oh);
++		if (w > avail_w * max_w * k) {
++			w = avail_w * max_w * k;
++			h = w * (oh / ow);
++		}
++		ws[p + left_cnt] = w;
++		hs[p + left_cnt] = h;
++		if (p < 0)
++			side_w[0] += w;
++		else if (p > 0)
++			side_w[1] += w;
++	}
++
++	/* The middle window keeps its size: if a side does not fit in its half
++	 * of the screen, both sides shrink by the same factor. */
++	float center_w = ws[left_cnt];
++	float half = avail_w / 2.0f - center_w / 2.0f;
++	/* With many windows the gaps alone would not fit. */
++	if (right_cnt > 0)
++		gap = fminf(gap, half * 0.25f / right_cnt);
++	float scale = 1.0f;
++	int side_cnt[2] = {left_cnt, right_cnt};
++	for (int i = 0; i < 2; i++) {
++		float room = half - gap * side_cnt[i];
++		if (side_w[i] > room)
++			scale = fminf(scale, room / side_w[i]);
++	}
++
++	float mid_x = m->w.x + m->w.width / 2.0f;
++	float mid_y = m->w.y + m->w.height / 2.0f;
++	float left = mid_x - center_w / 2.0f;
++	float right = mid_x + center_w / 2.0f;
++
++	for (int p = 0; p <= right_cnt; p++) {
++		Client *c = items[(focus + p) % n];
++		float k = p == 0 ? 1.0f : scale;
++		float w = fmaxf(1.0f, ws[p + left_cnt] * k);
++		float h = fmaxf(1.0f, hs[p + left_cnt] * k);
++		float x = p == 0 ? left : right + gap;
++		if (p > 0)
++			right = x + w;
++		client_tile_resize(c,
++						   (struct wlr_box){(int)(x + 0.5f),
++											(int)(mid_y - h / 2.0f + 0.5f),
++											(int)w, (int)h},
++						   0);
++	}
++	for (int p = 1; p <= left_cnt; p++) {
++		Client *c = items[((focus - p) % n + n) % n];
++		float w = fmaxf(1.0f, ws[left_cnt - p] * scale);
++		float h = fmaxf(1.0f, hs[left_cnt - p] * scale);
++		left -= gap + w;
++		client_tile_resize(c,
++						   (struct wlr_box){(int)(left + 0.5f),
++											(int)(mid_y - h / 2.0f + 0.5f),
++											(int)w, (int)h},
++						   0);
++	}
++
++	free(items);
++	free(ws);
++	free(hs);
++}
++
+ void overview(Monitor *m) {
+-	if (config.ov_tab_mode && !m->is_jump_mode && !m->ov_normal_mode) {
++	if (config.ov_carousel && !m->is_jump_mode) {
++		overview_carousel(m);
++	} else if (config.ov_tab_mode && !m->is_jump_mode && !m->ov_normal_mode) {
+ 		overview_scale_tab(m);
+ 	} else {
+ 		overview_scale(m);

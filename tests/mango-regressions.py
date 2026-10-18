@@ -169,6 +169,8 @@ def check_dir(directory, layout):
         "numlockon": "1", "repeat_delay": "600", "repeat_rate": "25",
         # Mod+S and the 4-finger swipe must close the overview, not cycle.
         "ov_tab_mode": "0",
+        # Cover-flow overview, from patches/mango-overview-carousel.patch.
+        "ov_carousel": "1",
     }.items():
         assert config.get(key) == [value], f"config.conf: {key}={config.get(key)}"
 

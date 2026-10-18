@@ -45,6 +45,8 @@ no guilt, just restart.
       gtk/Tokyo-Night/         ← il tema GTK di HyDE (Tokyonight-Storm): nautilus & co.
                                   come sul fisso. Vendorizzato: nixpkgs l'ha rimosso
       sddm/bg.png              ← lo sfondo di SDDM, e del desktop finché non ne scegli uno
+    patches/
+      mango-overview-carousel.patch ← l'overview a carosello (applicata da flake.nix)
     templates/{c,rust,zig,python}/
       shell.nix                ← LA devshell (usata anche da `nix develop ~/nixos-config#c`)
       flake.nix + .envrc       ← il boilerplate che il template copia nel progetto
@@ -311,9 +313,20 @@ pila). I tag sono 10 (`Mod+1..0`), visibili tutti nella barra; ripremere
 il tag corrente torna al precedente. `Mod+G` unisce la finestra a quella
 a destra in un gruppo a schede.
 
-`Mod+S` (o lo swipe a 4 dita) apre l'overview: le finestre di tutti i tag
-rimpicciolite in una griglia, stile Exposé (`ov_tab_mode=0`). Click
-sinistro va alla finestra, destro la chiude; `Mod+S` di nuovo esce.
+`Mod+S` (o lo swipe a 4 dita) apre l'overview a carosello: le finestre
+di tutti i tag in una fila, quella a fuoco grande al centro e le altre
+sempre più piccole ai lati. `←`/`→` (anche con `Mod`) o lo swipe a 3 dita
+la fanno girare; `Invio`, `Esc`, il click sinistro o di nuovo `Mod+S`
+vanno alla finestra scelta, nel suo tag; il click destro la chiude.
+
+Il carosello non c'è in mango: è una nostra patch,
+`patches/mango-overview-carousel.patch` (opzione `ov_carousel=1`),
+applicata da `mangoOverlay` in `flake.nix` a sistema, check e anteprima.
+mango quindi si compila in locale (un minuto circa) invece di arrivare
+dalla cache. Se un aggiornamento di nixpkgs la rompe, la build di mango
+fallisce e `nix flake check` lo dice prima del rebuild: si riadatta la
+patch o, per tornare a mango liscio, si toglie l'overlay e `ov_carousel`
+da `config.conf` (senza patch `mango -p` la rifiuta come opzione ignota).
 
 Una finestra da sola in un tag prende tutta la larghezza e, finché resta
 sola, `Mod+R` e il ridimensionamento non fanno nulla: è come funziona
