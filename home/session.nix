@@ -5,7 +5,7 @@ let
 in
 {
   # ══ I servizi del desktop: partono tutti con graphical-session.target ══
-  # (lo avvia mango-session-start da exec-once, vedi home/mango.nix)
+  # (lo avvia mango-session-start da exec_once, vedi home/mango.nix)
 
   # Finestra della password per le azioni da amministratore (polkit).
   services.polkit-gnome.enable = true;

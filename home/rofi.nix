@@ -112,9 +112,9 @@ in
   # ══ rofi: launcher (Mod+Space) e tutti i menu del desktop ════════════
   programs.rofi = {
     enable = true;
-    terminal = "kitty";
     theme = "${theme}";
-    extraConfig = {
+    settings = {
+      terminal = "kitty";
       modi = "drun,run,window";
       show-icons = true;
       icon-theme = config.gtk.iconTheme.name;

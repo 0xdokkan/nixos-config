@@ -38,7 +38,7 @@ let
   # ══ La sessione mango ════════════════════════════════════════════════
   # Il .desktop di mango lancia solo `mango`: nessun target systemd parte
   # e nessuno lo ferma all'uscita. Il target lo avvia la config di mango
-  # (exec-once=mango-session-start, home/mango.nix); questo wrapper fa la
+  # (exec_once=mango-session-start, home/mango.nix); questo wrapper fa la
   # parte finale: quando mango esce ferma i servizi grafici (waybar,
   # swaync, swayidle...) e pulisce l'ambiente, così il login successivo
   # riparte da zero.

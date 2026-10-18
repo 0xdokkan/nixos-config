@@ -145,10 +145,10 @@ def check_binds(path):
 
 def check_rules(path):
     text = path.read_text()
-    shielded = re.findall(r"^windowrule=(.*shield_when_capture:1.*)$", text, re.M)
+    shielded = re.findall(r"^window_rule=(.*shield_when_capture:1.*)$", text, re.M)
     # The Wi-Fi QR window shows the network password.
-    assert any(re.search(r"(^|,)appid:\^wifi-qr\$($|,)", rule) for rule in shielded), shielded
-    for rule in re.findall(r"^(?:windowrule|layerrule)=(.*)$", text, re.M):
+    assert any(re.search(r"(^|,)app_id:\^wifi-qr\$($|,)", rule) for rule in shielded), shielded
+    for rule in re.findall(r"^(?:window_rule|layer_rule)=(.*)$", text, re.M):
         for field in rule.split(","):
             assert ":" in field, f"{path}: malformed rule field {field!r} in {rule!r}"
 
@@ -157,18 +157,16 @@ def check_dir(directory, layout):
     config = settings(directory / "config.conf")
     for name in ("theme.conf", "host.conf", "rules.conf", "binds.conf"):
         assert f"./{name}" in config["source"], f"config.conf does not source {name}"
-    assert config["tagrule"] == ["id:*,layout_name:scroller"]
+    assert config["tag_rule"] == ["id:*,layout_name:scroller"]
     assert config["tag_num"] == ["10"]
-    assert config["exec-once"][0] == "mango-session-start"
+    assert config["exec_once"][0] == "mango-session-start"
     assert config["scroller_ignore_proportion_single"] == ["0"]
     assert config["scroller_default_proportion_single"] == ["1.0"]
     for key, value in {
         "tap_to_click": "1", "trackpad_disable_while_typing": "1",
         "trackpad_natural_scrolling": "1", "trackpad_click_method": "2",
         "mouse_accel_profile": "1", "enable_hotarea": "0",
-        "numlockon": "1", "repeat_delay": "600", "repeat_rate": "25",
-        # Mod+S and the 4-finger swipe must close the overview, not cycle.
-        "ov_tab_mode": "0",
+        "numlock_on": "1", "repeat_delay": "600", "repeat_rate": "25",
         # Cover-flow overview, from patches/mango-overview-carousel.patch.
         "ov_carousel": "1",
     }.items():
@@ -181,7 +179,7 @@ def check_dir(directory, layout):
     assert settings(directory / "host.conf")["xkb_rules_layout"] == [layout]
 
     theme = settings(directory / "theme.conf")
-    assert theme["focuscolor"] == ["0x7aa2f7ff"], theme["focuscolor"]
+    assert theme["focus_color"] == ["0x7aa2f7ff"], theme["focus_color"]
     assert theme["cursor_theme"] == ["Bibata-Modern-Ice"]
     assert theme["cursor_size"] == ["20"]
 
@@ -189,7 +187,8 @@ def check_dir(directory, layout):
     body = [line for line in gaming if line and not line.startswith("#")]
     assert body[0] == "source=./config.conf", "gaming.conf must start from config.conf"
     overrides = settings(directory / "gaming.conf")
-    for key in ("gappih", "gappiv", "gappoh", "gappov", "animations", "blur"):
+    gaps = [f"gap_{side}_{axis}" for side in ("inner", "outer") for axis in ("horizontal", "vertical")]
+    for key in gaps + ["animations", "blur"]:
         assert overrides.get(key) == ["0"], f"gaming.conf: {key}"
 
     # niri may appear in comments (where a setting came from), the old

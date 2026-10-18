@@ -15,8 +15,9 @@
 #   host.conf   layout tastiera (us sul fisso, it,us sul portatile:
 #               lo calcola home/mango.nix)
 #
-# `mango -p` esce sempre con 0, anche quando trova errori: per questo il
-# controllo cerca ERROR/WARNING nel suo output.
+# `mango -p` esce con 1 sugli errori ma con 0 sugli avvisi ([WARN], per
+# esempio due bind sullo stesso tasto): per questo il controllo guarda
+# anche il suo output.
 { pkgs
 , layout ? "us"
 , cursor ? { name = "Bibata-Modern-Ice"; size = 20; }
@@ -27,17 +28,17 @@ let
   c = name: alpha: "0x${palette.${name}}${alpha}";
   theme = pkgs.writeText "mango-theme.conf" ''
     # GENERATO da home/mango-configs.nix — colori da home/palette.nix
-    rootcolor=${c "bgDarker" "ff"}
-    bordercolor=${c "terminalBlack" "ff"}
-    focuscolor=${c "blue" "ff"}
-    maximizescreencolor=${c "green1" "ff"}
-    urgentcolor=${c "red" "ff"}
-    scratchpadcolor=${c "cyan" "ff"}
-    globalcolor=${c "magenta" "ff"}
-    overlaycolor=${c "orange" "ff"}
-    dropcolor=${c "blue" "55"}
-    splitcolor=${c "yellow" "ff"}
-    shadowscolor=0x00000066
+    root_color=${c "bgDarker" "ff"}
+    border_color=${c "terminalBlack" "ff"}
+    focus_color=${c "blue" "ff"}
+    maximized_screen_color=${c "green1" "ff"}
+    urgent_color=${c "red" "ff"}
+    scratchpad_color=${c "cyan" "ff"}
+    global_color=${c "magenta" "ff"}
+    overlay_color=${c "orange" "ff"}
+    drop_color=${c "blue" "55"}
+    split_color=${c "yellow" "ff"}
+    shadows_color=0x00000066
 
     # Schede dei gruppi (Mod+G)
     group_bar_height=26
@@ -81,9 +82,11 @@ pkgs.runCommand "mango-config-checked"
 
   export HOME=$TMPDIR XDG_RUNTIME_DIR=$TMPDIR
   for conf in config.conf gaming.conf; do
-    mango -c $out/$conf -p 2>&1 | sed 's/\x1b\[[0-9;]*m//g' > check.log || true
+    status=0
+    mango -c $out/$conf -p > raw.log 2>&1 || status=$?
+    sed 's/\x1b\[[0-9;]*m//g' raw.log > check.log
     cat check.log
-    if grep -qiE 'error|warning' check.log; then
+    if [ $status -ne 0 ] || grep -qiE 'error|warn' check.log; then
       echo "mango -p: $conf non è valida" >&2
       exit 1
     fi

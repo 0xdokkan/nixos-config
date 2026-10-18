@@ -281,7 +281,7 @@ programmi piccoli, ognuno nel suo modulo e con i colori di `home/palette.nix`:
 | password admin, dischi, batteria | polkit-gnome, udiskie, batsignal | `home/session.nix` |
 
 La sessione: SDDM avvia `mango-session` (un wrapper, `hosts/common.nix`),
-che avvia mango. L'`exec-once` della config, `mango-session-start`, passa
+che avvia mango. L'`exec_once` della config, `mango-session-start`, passa
 l'ambiente di mango a systemd e dbus e avvia `mango-session.target`, che
 tira su `graphical-session.target`: tutti i programmi della tabella sono
 servizi utente legati a quel target. Quando mango esce, il wrapper ferma
@@ -319,9 +319,11 @@ sempre più piccole ai lati. `←`/`→` (anche con `Mod`) o lo swipe a 3 dita
 la fanno girare; `Invio`, `Esc`, il click sinistro o di nuovo `Mod+S`
 vanno alla finestra scelta, nel suo tag; il click destro la chiude.
 
-Il carosello non c'è in mango: è una nostra patch,
+Il carosello non c'è in mango: è una nostra patch (per mango 0.18),
 `patches/mango-overview-carousel.patch` (opzione `ov_carousel=1`),
 applicata da `mangoOverlay` in `flake.nix` a sistema, check e anteprima.
+Le finestre nell'overview sono anteprime rimpicciolite, non finestre
+ridimensionate: il contenuto non si riadatta.
 mango quindi si compila in locale (un minuto circa) invece di arrivare
 dalla cache. Se un aggiornamento di nixpkgs la rompe, la build di mango
 fallisce e `nix flake check` lo dice prima del rebuild: si riadatta la

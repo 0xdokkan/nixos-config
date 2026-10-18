@@ -19,7 +19,7 @@ let
     rofi = config.programs.rofi.finalPackage;
   };
 
-  # exec-once della config: porta l'ambiente di mango (WAYLAND_DISPLAY,
+  # exec_once della config: porta l'ambiente di mango (WAYLAND_DISPLAY,
   # DISPLAY, MANGO_INSTANCE_SIGNATURE e quello del login) a systemd e
   # dbus, POI avvia il target. Nell'ordine inverso i servizi partirebbero
   # senza sapere dov'è il display. Lo stop è nel wrapper mango-session
