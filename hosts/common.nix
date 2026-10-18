@@ -72,8 +72,6 @@ in
   nixpkgs.config.allowUnfree = true;   # discord, steam, obsidian, claude-code, nvidia...
   # Cache pubblicata da Numtide per llm-agents: evita di compilare Codex.
   # È una fonte di binari fidata aggiuntiva, con verifica della firma.
-  # (Niente cache di Noctalia: il pacchetto è patchato e usa il nostro
-  #  nixpkgs, quindi lì non ci sarebbe mai.)
   nix.settings.extra-substituters = [ "https://cache.numtide.com" ];
   nix.settings.extra-trusted-public-keys = [
     "niks3.numtide.com-1:DTx8wZduET09hRmMtKdQDxNNthLQETkc/yaX7M4qK0g="

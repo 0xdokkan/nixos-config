@@ -16,7 +16,6 @@
   #                 questo flake lo estrae e lo patcha. Voluto. :3
   #   llm-agents: ultime release delle CLI e app AI, aggiornabili da sole.
   #   nix-index-database: indice precompilato per i comandi non trovati.
-  #   noctalia: release 5.2.1, compilata col nixpkgs del sistema.
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
 
@@ -39,32 +38,12 @@
     # Niente follows: conserva il nixpkgs testato da Numtide e i cache hit,
     # anche quando aggiorni solo questo input senza aggiornare il sistema.
     llm-agents.url = "github:numtide/llm-agents.nix";
-
-    # Release esplicita: niente salto involontario a nuove major/API IPC.
-    # follows: con la patch locale il binario non è mai nella cache upstream,
-    # quindi si compila comunque. Con il nostro nixpkgs almeno glibc e PAM
-    # sono quelli del sistema: il lockscreen carica in-process i moduli PAM
-    # di NixOS, che con una glibc più vecchia potrebbero non caricarsi.
-    noctalia = {
-      url = "github:noctalia-dev/noctalia/v5.2.1";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
   };
 
-  outputs = { self, nixpkgs, home-manager, nix-index-database, helium-flake, llm-agents, noctalia, ... }:
+  outputs = { self, nixpkgs, home-manager, nix-index-database, helium-flake, llm-agents, ... }:
     let
       system = "x86_64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
-      # La 5.2.1 espone solo il toggle manuale: due IPC additivi conservano
-      # Alt+F8 = acceso / Alt+F9 = spento anche fuori dagli orari programmati.
-      noctaliaSource = pkgs.applyPatches {
-        name = "noctalia-5.2.1-source";
-        src = noctalia.packages.${system}.default.src;
-        patches = [ ./patches/noctalia-nightlight-ipc.patch ];
-      };
-      noctaliaPackage = noctalia.packages.${system}.default.overrideAttrs (_: {
-        src = noctaliaSource;
-      });
       # le devshell dei template sono funzioni { pkgs } → mkShell:
       # le stesse identiche shell le esponiamo anche qui per uso "scratch"
       shell = name: import ./templates/${name}/shell.nix { inherit pkgs; };
@@ -83,7 +62,6 @@
             home-manager.useGlobalPkgs = true;
             home-manager.useUserPackages = true;
             home-manager.extraSpecialArgs = {
-              inherit noctaliaPackage;
               aiPackages = llm-agents.packages.${system};
             };
             home-manager.users.dokkan = import ./home;
@@ -160,49 +138,83 @@
             touch "$out"
           '';
         niri-gamemode = import ./tests/gamemode.nix { inherit pkgs; };
-        noctalia-idle = import ./tests/noctalia-idle.nix { inherit pkgs noctaliaSource; };
-        noctalia-nightlight = pkgs.runCommand "noctalia-nightlight-checked" {
-          nativeBuildInputs = [ pkgs.python3 pkgs.stdenv.cc ];
-        } ''
-          python ${./tests/noctalia-nightlight.py} ${noctaliaSource}
-          touch "$out"
-        '';
-        noctalia-settings = import ./tests/noctalia-settings.nix {
-          inherit pkgs noctaliaPackage;
-          configFile = self.nixosConfigurations.armoredcoreVIP.config.home-manager.users.dokkan.xdg.configFile."noctalia/config.toml".source;
-          paletteFile = ./dotfiles/noctalia/palettes/TokyoNightStorm.json;
-        };
-        noctalia-integration =
+        # idle.py con bus, locker e power manager simulati, più il controllo
+        # sulla riga con cui hyprlock conferma il lock.
+        idle = import ./tests/idle.nix { inherit pkgs; };
+        # I pezzi del desktop ci sono, su entrambi gli host, e partono con
+        # la sessione grafica.
+        desktop-integration =
           let
             configs = map (host: self.nixosConfigurations.${host}.config)
               [ "armoredcoreVIP" "armoredcoreVIF" ];
-            valid = c: let home = c.home-manager.users.dokkan; in
-              !c.programs.dms-shell.enable
-              && c.services.upower.enable
+            homeOf = c: c.home-manager.users.dokkan;
+            laptop = c: c.networking.hostName == "armoredcoreVIP";
+            boundToSession = unit:
+              pkgs.lib.elem "graphical-session.target" unit.Install.WantedBy
+              && pkgs.lib.elem "graphical-session.target" unit.Unit.PartOf;
+            valid = c: let home = homeOf c; in
+              c.services.upower.enable
               && c.security.polkit.enable
               && c.services.power-profiles-daemon.enable
-              && home.programs.noctalia.enable
-              && home.programs.noctalia.systemd.enable
-              && home.programs.noctalia.package.outPath == noctaliaPackage.outPath
-              && home.programs.noctalia.settings.shell.polkit_agent
-              && home.programs.noctalia.settings.lockscreen.enabled
-              && home.programs.noctalia.settings.lockscreen.lock_before_suspend
-              && !home.programs.noctalia.settings.idle.behavior.lock.enabled
-              && !home.programs.noctalia.settings.idle.behavior.screen-off.enabled
-              && !home.programs.noctalia.settings.idle.behavior.suspend.enabled
-              && !home.programs.noctalia.settings.idle.behavior.lock-and-suspend.enabled
-              && home.systemd.user.services ? noctalia-idle
-              && home.xdg.desktopEntries ? noctalia-wifi-qr
-              && !(home.xdg.configFile ? DankMaterialShell);
-            idleCommand = builtins.head (pkgs.lib.toList
-              (builtins.head configs).home-manager.users.dokkan.systemd.user.services.noctalia-idle.Service.ExecStart);
+              && home.programs.waybar.enable
+              && home.programs.waybar.systemd.enable
+              && home.programs.rofi.enable
+              && home.services.swaync.enable
+              && home.services.swayosd.enable
+              && home.services.polkit-gnome.enable
+              && home.services.cliphist.enable
+              && home.services.wl-clip-persist.enable
+              && home.services.awww.enable
+              && home.services.udiskie.enable
+              && !home.services.udiskie.automount
+              && home.programs.hyprlock.enable
+              && home.services.batsignal.enable == laptop c
+              && boundToSession home.systemd.user.services.idle
+              && boundToSession home.systemd.user.services.wl-gammarelay-rs
+              && home.systemd.user.services.hyprlock.Unit.X-RestartIfChanged == false
+              && !(home.systemd.user.services.hyprlock ? Install)
+              && home.xdg.desktopEntries ? wifi-qr
+              && pkgs.lib.elem "battery" home.programs.waybar.settings.main.modules-right == laptop c
+              && !(home.xdg.configFile ? "noctalia/config.toml");
+            home = homeOf (builtins.head configs);
+            idleCommand = home.systemd.user.services.idle.Service.ExecStart;
+            lockCommand = home.systemd.user.services.hyprlock.Service.ExecStart;
+            rofiConfig = home.home.file."${home.home.homeDirectory}/.config/rofi/config.rasi".source;
+            python = pkgs.python3.withPackages (ps: [ ps.jsonschema ]);
           in
           assert pkgs.lib.all valid configs;
-          assert (builtins.head configs).home-manager.users.dokkan.programs.noctalia.settings
-            == (builtins.elemAt configs 1).home-manager.users.dokkan.programs.noctalia.settings;
-          pkgs.runCommand "noctalia-integration-checked" { } ''
-            # Costruisce anche il wrapper idle (incluso ShellCheck), senza avviarlo.
+          pkgs.runCommand "desktop-integration-checked" {
+            nativeBuildInputs = [ pkgs.jq python home.programs.rofi.finalPackage home.programs.hyprlock.package ];
+          } ''
+            export HOME=$TMPDIR XDG_RUNTIME_DIR=$TMPDIR XDG_CACHE_HOME=$TMPDIR
+            # Costruisce i wrapper (incluso ShellCheck), senza avviarli.
             test -x ${pkgs.lib.escapeShellArg idleCommand}
+            grep -q 'hyprlock.log' ${pkgs.lib.escapeShellArg lockCommand}
+            jq -e '.[0]["modules-left"] == ["ext/workspaces"]' \
+              ${home.xdg.configFile."waybar/config".source}
+            grep -qx 'show_pass = wifi-qr' \
+              ${home.xdg.configFile."networkmanager-dmenu/config.ini".source}
+
+            # rofi con un tema rotto torna in silenzio a quello di default:
+            # il tema letto deve essere il nostro.
+            rofi -config ${rofiConfig} -dump-theme > theme
+            grep -q 'accent: *rgba ( 122, 162, 247' theme
+            grep -q 'width: *440px' theme
+
+            # swaync: la config rispetta lo schema della versione installata.
+            python - ${home.xdg.configFile."swaync/config.json".source} \
+              ${home.services.swaync.package}/etc/xdg/swaync/configSchema.json <<'PY'
+            import json, sys, jsonschema
+            config, schema = (json.load(open(path)) for path in sys.argv[1:])
+            jsonschema.validators.validator_for(schema)(schema).validate(config)
+            PY
+
+            # hyprlock legge la config prima di cercare il display: gli
+            # errori (opzioni inesistenti) arrivano anche senza Wayland.
+            hyprlock -c ${home.xdg.configFile."hypr/hyprlock.conf".source} > hyprlock.log 2>&1 || true
+            cat hyprlock.log
+            grep -q "Couldn't connect to a wayland compositor" hyprlock.log
+            if grep -qi 'config error' hyprlock.log; then exit 1; fi
             touch "$out"
           '';
         noctalia-filesearch = pkgs.runCommand "noctalia-filesearch-checked" {
@@ -275,9 +287,6 @@
           in
           assert laptop.services.upower.enable;
           assert home.gtk.font.name == "Monaspace Argon";
-          assert home.programs.noctalia.settings.shell.font_family == "Monaspace Argon";
-          assert !home.programs.noctalia.settings.theme.templates.enable_builtin_templates;
-          assert !home.programs.noctalia.settings.theme.templates.enable_community_templates;
           assert home.qt.platformTheme.name == "qtct";
           assert laptop.environment.sessionVariables.QT_QPA_PLATFORMTHEME == home.home.sessionVariables.QT_QPA_PLATFORMTHEME;
           pkgs.runCommand "desktop-settings-checked" {
@@ -297,6 +306,15 @@
             done
             touch "$out"
           '';
+      };
+
+      # ── Anteprima del desktop in una VM: `nix build .#desktop-preview` ──
+      # mango vero con le config del portatile; screenshot in result/.
+      # Non è un check: ci mette minuti e nixup lancia i check a ogni update.
+      packages.${system}.desktop-preview = import ./tests/desktop-preview.nix {
+        inherit pkgs;
+        home = self.nixosConfigurations.armoredcoreVIP.config.home-manager.users.dokkan;
+        wallpaper = ./dotfiles/sddm/bg.png;
       };
 
       # ── Devshell "scratch": `nix develop ~/nixos-config#<nome>` da ovunque ──

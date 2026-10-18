@@ -4,8 +4,11 @@
   imports = [
     ./desktop.nix   # app, GTK/Qt, cursore, kitty e altri dotfiles
     ./mango.nix     # il compositor: config validata, sessione systemd
-    ./noctalia.nix  # shell condivisa: barra, launcher, lock e Tokyo Night Storm
-    ./noctalia-idle.nix # tempi AC/batteria, senza sospendere i lavori CLI
+    ./waybar.nix    # la barra
+    ./rofi.nix      # launcher e menu (wifi, bluetooth, Wi-Fi QR)
+    ./notifications.nix # swaync (notifiche, centro di controllo) e swayosd
+    ./lock.nix      # hyprlock e idle AC/batteria
+    ./session.nix   # polkit, appunti, sfondo, luce notturna, dischi, batteria
     ./shell.nix     # zsh + p10k + CLI belt
     ./dev.nix       # git, editor, dev quotidiano
     ./maintenance.nix # aggiornamento assistito del sistema (nixup)

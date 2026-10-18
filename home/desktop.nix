@@ -31,14 +31,14 @@ in
     slurp
     swappy
     # wl-copy/wl-paste servono anche a nvim e agli script da terminale.
-    # La cronologia clipboard è gestita dal backend nativo di Noctalia.
+    # La cronologia è cliphist (home/session.nix).
     wl-clipboard
-    # luminosità/audio (il filtro luce blu è gestito da Noctalia)
+    # luminosità/audio da terminale; volume e OSD sono swayosd
     brightnessctl
     pamixer
     pavucontrol
-    # dischi removibili (il client; il demone udisks2 è a sistema)
-    udiskie
+    # media (bind XF86AudioPlay & co.)
+    playerctl
     # notifiche da script
     libnotify
     # Helper ricerca file (Mod+Shift+E): risultati dmenu aperti via MIME.
@@ -48,7 +48,7 @@ in
     xdotool
     # SENZA questo, nessuna icona delle app qui sotto viene trovata:
     # è lui che mette share/icons/hicolor/index.theme nel profilo utente,
-    # e chi cerca un'icona per nome (Noctalia, Qt, GTK) senza index.theme non
+    # e chi cerca un'icona per nome (rofi, Qt, GTK) senza index.theme non
     # guarda nemmeno nella cartella. Scoperto al primo boot: si vedevano
     # solo steam (profilo di sistema, che l'index ce l'ha) e helium
     # (percorso assoluto nel .desktop).
@@ -86,8 +86,9 @@ in
   ];
 
   # ══ GTK: icone Tela viola, Monaspace Argon, tema Tokyo-Night ════════
-  # Noctalia fa il theming della SUA shell; per le app GTK (nautilus in testa)
-  # il look del fisso viene da queste tre cose, che HM scrive in
+  # Barra, rofi, notifiche e lock prendono i colori da home/palette.nix;
+  # per le app GTK (nautilus in testa) il look del fisso viene da queste
+  # tre cose, che HM scrive in
   # gtk-3.0/settings.ini, gtk-4.0/settings.ini + gtk.css, e in dconf
   # (org/gnome/desktop/interface: le app GTK4 lo leggono via portale).
   # hicolor (sopra) resta necessario: senza il suo index.theme nessuna
@@ -120,7 +121,7 @@ in
   dconf.settings."org/gnome/desktop/interface".monospace-font-name = "${desktopFont} 10";
 
   # Installa ENTRAMBI i plugin: la sola variabile QT_QPA_PLATFORMTHEME
-  # non basta. Il theming delle app di Noctalia è disabilitato: li gestisce HM.
+  # non basta.
   qt = {
     enable = true;
     platformTheme.name = "qtct";
@@ -141,9 +142,9 @@ in
     gtk.enable = true;
   };
 
-  # Noctalia: configurazione e palette in home/noctalia.nix. La vecchia
-  # config DMS è nella storia git (fino al commit 66176da); lo stato DMS
-  # locale (wallpaper, notepad, cronologia) non viene cancellato.
+  # Le vecchie shell sono nella storia git: DMS fino al commit 66176da,
+  # Noctalia fino al passaggio a mango (ottobre 2026). Il loro stato
+  # locale in ~/.local/state non viene cancellato.
 
   # Helium (input helium-flake nel flake.nix, modulo HM in sharedModules).
   # Il wrapper aggiunge da solo --ozone-platform-hint=auto quando vede
@@ -197,7 +198,7 @@ in
   # la cartella deve esistere: la usano swappy e screenshot.sh
   home.file."Pictures/Screenshots/.keep".text = "";
 
-  # hyprlock: NON portato — il lock è Noctalia (Mod+L).
+  # hyprlock: home/lock.nix (Mod+L).
   # fastfetch: dotfiles/fastfetch (config + immagini), wiring in shell.nix.
   # .gdbinit: in dev.nix 🚩
 
@@ -216,8 +217,8 @@ in
       "x-scheme-handler/https"   = "librewolf.desktop";
       "x-scheme-handler/about"   = "librewolf.desktop";
       "x-scheme-handler/unknown" = "librewolf.desktop";
-      # cartelle → nautilus: lo usano Noctalia ("apri
-      # cartella" nelle notifiche/download) e xdg-open. Senza, si aprono in kitty.
+      # cartelle → nautilus: lo usano le notifiche ("apri cartella" nei
+      # download), filesearch.sh e xdg-open. Senza, si aprono in kitty.
       "inode/directory"          = "org.gnome.Nautilus.desktop";
       # PDF e fumetti → helium, come su Arch
       "application/pdf"               = "helium.desktop";

@@ -1,19 +1,26 @@
-"""One swayidle instance, two power profiles; no direct suspend or unlock.
+"""One swayidle instance, two power profiles; locking always goes through hyprlock.
 
 UPower is polled every five seconds. Changing power source re-arms the idle
 timers and restores monitor power. A failed power query selects short privacy
 timeouts but never automatic suspend. swayidle handles Wayland and logind idle
-inhibitors (including Noctalia caffeine); sleep-only inhibitors affect suspend,
-not screen locking. Noctalia owns the logind lock-before-sleep handshake.
+inhibitors; sleep-only inhibitors affect suspend, not screen locking.
+
+hyprlock runs as its own user service (hyprlock.service, home/lock.nix), so
+restarting this supervisor can never kill an active lock screen. A lock only
+counts once hyprlock logs that the compositor confirmed it ("onLockLocked"):
+suspend, screen-off and before-sleep all wait for that, and give up instead
+of sleeping or blanking an unlocked session.
 """
 
 import json
 import os
+from pathlib import Path
 import shlex
 import signal
 import subprocess
 import sys
 import threading
+import time
 
 
 PROFILES = {
@@ -23,6 +30,10 @@ PROFILES = {
 }
 POLL_SECONDS = 5
 COMMAND_TIMEOUT = 5
+# logind waits at most 5 s (InhibitDelayMaxSec) for before-sleep handlers.
+LOCK_TIMEOUT = 4
+LOCKED_LINE = "onLockLocked called"
+LOCK_SERVICE = "hyprlock.service"
 
 
 def run(*args):
@@ -55,6 +66,38 @@ def power_profile():
         return "unknown"
 
 
+def lock_log():
+    return Path(os.environ["XDG_RUNTIME_DIR"]) / "hyprlock.log"
+
+
+def lock_active():
+    try:
+        run("systemctl", "--user", "--quiet", "is-active", LOCK_SERVICE)
+        return True
+    except subprocess.CalledProcessError:
+        return False
+
+
+def lock():
+    """Start hyprlock if needed and wait until the compositor has locked."""
+    log = lock_log()
+    if not lock_active():
+        # A stale log from the previous lock must not confirm this one.
+        log.unlink(missing_ok=True)
+        run("systemctl", "--user", "start", LOCK_SERVICE)
+    deadline = time.monotonic() + LOCK_TIMEOUT
+    while time.monotonic() < deadline:
+        try:
+            if LOCKED_LINE in log.read_text(errors="replace"):
+                return
+        except FileNotFoundError:
+            pass
+        if not lock_active():
+            raise RuntimeError("hyprlock exited before locking")
+        time.sleep(0.05)
+    raise RuntimeError("hyprlock did not confirm the lock in time")
+
+
 def action(name):
     if name == "suspend":
         # Recheck at execution time: the adapter may have been plugged in
@@ -67,47 +110,46 @@ def action(name):
         ).split(":")
         if "sleep" in blocked or "idle" in blocked:
             return
-        # Unlike lock-and-suspend, plain lock fails if the user disabled the
-        # locker in the GUI. Do not let upstream's disabled-locker fallback
-        # turn an automatic suspend into an unlocked suspend.
-        run("noctalia", "msg", "session", "lock")
-        # With no usable outputs upstream may defer the lock and immediately
-        # execute its post-lock callback. Refuse that path for idle suspend.
-        # `locked` here includes an active lock request; the native callback
-        # below still waits for the compositor's acknowledgment in that case.
-        status = json.loads(run("noctalia", "msg", "status"))
-        if not isinstance(status, dict) or status.get("locked") is not True:
-            raise ValueError("No active Noctalia lock; automatic suspend cancelled")
-        # Noctalia waits for the compositor's locked event, then invokes the
-        # systemctl backend configured in noctalia-idle.nix. Never plain sleep.
-        run("noctalia", "msg", "session", "lock-and-suspend")
+        # Never an unlocked suspend: lock() raises if hyprlock cannot lock.
+        lock()
+        # The final inhibitor check closes the race with a job started
+        # after the BlockInhibited read.
+        run("systemctl", "--check-inhibitors=yes", "--no-ask-password", "suspend")
     elif name == "lock":
-        run("noctalia", "msg", "session", "lock")
+        lock()
     elif name == "screen-off":
-        # Retry locking if the earlier timeout met a transient IPC failure.
-        # A failed request leaves the display on, rather than masking failure.
-        run("noctalia", "msg", "session", "lock")
-        run("noctalia", "msg", "dpms-off")
+        # Retry locking if the earlier timeout met a transient failure.
+        # A failed lock leaves the display on, rather than masking it.
+        lock()
+        run("wlopm", "--off", "*")
     elif name == "screen-on":
-        run("noctalia", "msg", "dpms-on")
+        run("wlopm", "--on", "*")
     else:
         raise ValueError(f"Unknown action: {name}")
 
 
 def swayidle_command(profile):
-    lock, screen, suspend = PROFILES[profile]
+    lock_after, screen_after, suspend_after = PROFILES[profile]
 
     def command(name):
         return shlex.join([sys.executable, os.path.realpath(__file__), name])
 
+    # -w: swayidle holds logind's sleep delay until before-sleep returns,
+    # so the machine never sleeps before the lock is confirmed.
     args = [
         "swayidle", "-w",
-        "timeout", str(lock), command("lock"),
-        "timeout", str(screen), command("screen-off"),
+        "timeout", str(lock_after), command("lock"),
+        "timeout", str(screen_after), command("screen-off"),
         "resume", command("screen-on"),
     ]
-    if suspend is not None:
-        args.extend(["timeout", str(suspend), command("suspend")])
+    if suspend_after is not None:
+        args.extend(["timeout", str(suspend_after), command("suspend")])
+    args.extend([
+        # Mod+L and anything else calling `loginctl lock-session`.
+        "lock", command("lock"),
+        "before-sleep", command("lock"),
+        "after-resume", command("screen-on"),
+    ])
     return args
 
 
@@ -127,8 +169,8 @@ def restore_display():
     try:
         action("screen-on")
     except (subprocess.SubprocessError, OSError):
-        # Expected if Noctalia already stopped at logout; never hide the
-        # original supervisor failure or leave its child process alive.
+        # Expected if the compositor already went away at logout; never hide
+        # the original supervisor failure or leave its child process alive.
         pass
 
 
@@ -162,12 +204,12 @@ def main():
             signal.signal(signum, lambda _signum, _frame: stop.set())
         supervise(stop)
     else:
-        raise ValueError("Usage: noctalia-idle [lock|screen-off|screen-on|suspend]")
+        raise ValueError("Usage: idle [lock|screen-off|screen-on|suspend]")
 
 
 if __name__ == "__main__":
     try:
         main()
-    except (subprocess.SubprocessError, OSError, ValueError, RuntimeError, AttributeError) as error:
-        print(f"noctalia-idle: {error}", file=sys.stderr)
+    except (subprocess.SubprocessError, OSError, ValueError, RuntimeError, AttributeError, KeyError) as error:
+        print(f"idle: {error}", file=sys.stderr)
         sys.exit(1)

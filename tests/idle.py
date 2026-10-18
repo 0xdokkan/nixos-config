@@ -1,10 +1,12 @@
-"""Regression tests: never contact the real bus, compositor or power manager."""
+"""Regression tests: never contact the real bus, compositor, locker or power manager."""
 
 import importlib.util
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -13,7 +15,12 @@ sys.dont_write_bytecode = True
 spec = importlib.util.spec_from_file_location("idle", sys.argv.pop(1))
 idle = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(idle)
-noctalia_source = Path(sys.argv.pop(1)) if len(sys.argv) > 1 else None
+hyprlock_source = Path(sys.argv.pop(1)) if len(sys.argv) > 1 else None
+
+ACTIVE = ("systemctl", "--user", "--quiet", "is-active", "hyprlock.service")
+START = ("systemctl", "--user", "start", "hyprlock.service")
+SUSPEND = ("systemctl", "--check-inhibitors=yes", "--no-ask-password", "suspend")
+INACTIVE = subprocess.CalledProcessError(3, "systemctl is-active")
 
 
 class IdleTests(unittest.TestCase):
@@ -21,6 +28,15 @@ class IdleTests(unittest.TestCase):
         self.runner = patch.object(idle, "run")
         self.run = self.runner.start()
         self.addCleanup(self.runner.stop)
+        runtime = tempfile.TemporaryDirectory()
+        self.addCleanup(runtime.cleanup)
+        self.log = Path(runtime.name) / "hyprlock.log"
+        environment = patch.dict(os.environ, {"XDG_RUNTIME_DIR": runtime.name})
+        environment.start()
+        self.addCleanup(environment.stop)
+
+    def calls(self):
+        return [call.args for call in self.run.call_args_list]
 
     def test_profiles_and_no_sleep_on_ac_or_unknown(self):
         self.assertEqual(idle.PROFILES["ac"], (900, 1200, None))
@@ -33,8 +49,13 @@ class IdleTests(unittest.TestCase):
                 [int(args[i + 1]) for i, word in enumerate(args) if word == "timeout"],
                 [timer for timer in timers if timer is not None],
             )
-            self.assertIn("resume", args)
-            self.assertNotIn("before-sleep", args)
+            # Mod+L (loginctl lock-session) and sleep both go through lock().
+            events = {args[i]: args[i + 1] for i in range(2, len(args) - 1)
+                      if args[i] in ("resume", "lock", "before-sleep", "after-resume")}
+            self.assertTrue(events["lock"].endswith(" lock"))
+            self.assertTrue(events["before-sleep"].endswith(" lock"))
+            self.assertTrue(events["resume"].endswith(" screen-on"))
+            self.assertTrue(events["after-resume"].endswith(" screen-on"))
             self.assertNotIn("unlock", args)
             self.assertEqual(any(arg.endswith(" suspend") for arg in args), profile == "battery")
 
@@ -60,43 +81,25 @@ class IdleTests(unittest.TestCase):
             for blocked in ["sleep", "idle", "handle-power-key:sleep", "idle:sleep"]:
                 self.run.return_value = json.dumps({"type": "s", "data": blocked})
                 idle.action("suspend")
+                self.assertEqual(self.calls()[0][0], "busctl")
                 self.assertEqual(self.run.call_count, 1)
-                self.assertEqual(self.run.call_args.args[0], "busctl")
                 self.run.reset_mock()
-        idle.action("lock")
-        self.run.assert_called_once_with("noctalia", "msg", "session", "lock")
 
-    def test_suspend_uses_acknowledged_lock_and_never_direct_systemctl(self):
-        self.run.side_effect = [
-            '{"type":"s","data":"handle-power-key"}', "ok", '{"locked":true}', "ok",
-        ]
+    def test_suspend_waits_for_the_confirmed_lock(self):
+        self.log.write_text("[LOG] onLockLocked called\n")
+        self.run.side_effect = ['{"type":"s","data":"handle-power-key"}', "", ""]
         with patch.object(idle, "power_profile", return_value="battery"):
             idle.action("suspend")
-        self.assertEqual(self.run.call_count, 4)
-        self.assertEqual(self.run.call_args_list[-3].args, ("noctalia", "msg", "session", "lock"))
-        self.assertEqual(self.run.call_args_list[-2].args, ("noctalia", "msg", "status"))
-        self.assertEqual(self.run.call_args.args, ("noctalia", "msg", "session", "lock-and-suspend"))
+        # Already locked: no second hyprlock, then the checked suspend.
+        self.assertEqual(self.calls()[1:], [ACTIVE, SUSPEND])
 
-    def test_disabled_or_unavailable_locker_never_suspends(self):
-        self.run.side_effect = [
-            '{"type":"s","data":""}',
-            subprocess.CalledProcessError(1, "noctalia msg session lock"),
-        ]
+    def test_failed_lock_never_suspends(self):
+        self.run.side_effect = ['{"type":"s","data":""}', INACTIVE, "", INACTIVE]
         with patch.object(idle, "power_profile", return_value="battery"):
-            with self.assertRaises(subprocess.CalledProcessError):
+            with self.assertRaises(RuntimeError):
                 idle.action("suspend")
-        self.assertEqual(self.run.call_count, 2)
-        self.assertEqual(self.run.call_args.args, ("noctalia", "msg", "session", "lock"))
-
-    def test_deferred_or_malformed_lock_status_never_suspends(self):
-        for status in ['{"locked":false}', '{"locked":"true"}', "{}", "[]", "bad json"]:
-            self.run.reset_mock()
-            self.run.side_effect = ['{"type":"s","data":""}', "ok", status]
-            with patch.object(idle, "power_profile", return_value="battery"):
-                with self.assertRaises(ValueError):
-                    idle.action("suspend")
-            self.assertEqual(self.run.call_count, 3)
-            self.assertEqual(self.run.call_args.args, ("noctalia", "msg", "status"))
+        self.assertNotIn(SUSPEND, self.calls())
+        self.assertIn(START, self.calls())
 
     def test_inhibitor_failures_never_suspend(self):
         with patch.object(idle, "power_profile", return_value="battery"):
@@ -110,22 +113,56 @@ class IdleTests(unittest.TestCase):
                 idle.action("suspend")
             self.assertEqual(self.run.call_count, 1)
 
+    def test_lock_starts_hyprlock_and_ignores_a_stale_log(self):
+        self.log.write_text("[LOG] onLockLocked called\n")   # previous lock
+        self.run.side_effect = [INACTIVE, "", "", ""]
+        started = []
+
+        def sleep(_seconds):
+            # The service starts and truncates the log; the compositor
+            # confirms on the second poll.
+            started.append(True)
+            if len(started) == 1:
+                self.assertFalse(self.log.exists(), "stale log not removed")
+                self.log.write_text("[LOG] locking\n")
+            else:
+                self.log.write_text("[LOG] locking\n[LOG] onLockLocked called\n")
+
+        with patch.object(idle.time, "sleep", side_effect=sleep):
+            idle.lock()
+        self.assertEqual(self.calls()[:2], [ACTIVE, START])
+        self.assertEqual(len(started), 2)
+
+    def test_lock_fails_when_hyprlock_exits_or_hangs(self):
+        self.run.side_effect = [INACTIVE, "", INACTIVE]
+        with patch.object(idle.time, "sleep"):
+            with self.assertRaisesRegex(RuntimeError, "exited"):
+                idle.lock()
+        self.run.reset_mock(side_effect=True)
+        self.run.return_value = ""
+        clock = iter([0.0, 1.0, 2.0, 3.0, 4.5])
+        with patch.object(idle.time, "monotonic", side_effect=lambda: next(clock)), \
+                patch.object(idle.time, "sleep"):
+            with self.assertRaisesRegex(RuntimeError, "in time"):
+                idle.lock()
+        self.assertNotIn(START, self.calls())   # already active: no second locker
+        self.assertLess(idle.LOCK_TIMEOUT, 5, "must fit logind's 5 s sleep delay")
+
     def test_display_off_locks_first_and_failure_stops_sequence(self):
+        self.log.write_text("onLockLocked called\n")
         idle.action("screen-off")
-        self.assertEqual([call.args for call in self.run.call_args_list], [
-            ("noctalia", "msg", "session", "lock"), ("noctalia", "msg", "dpms-off"),
-        ])
+        self.assertEqual(self.calls(), [ACTIVE, ("wlopm", "--off", "*")])
         self.run.reset_mock()
-        self.run.side_effect = subprocess.CalledProcessError(1, "noctalia")
+        self.run.side_effect = [INACTIVE, subprocess.CalledProcessError(1, "systemctl start")]
         with self.assertRaises(subprocess.CalledProcessError):
             idle.action("screen-off")
-        self.assertEqual(self.run.call_count, 1)
+        self.assertNotIn(("wlopm", "--off", "*"), self.calls())
 
     def test_run_has_bounded_timeout_and_no_shell(self):
         # Test the real runner with only subprocess.run mocked.
         self.runner.stop()
         with patch.object(idle.subprocess, "run") as process:
-            idle.run("noctalia", "msg", "dpms-on")
+            idle.run("wlopm", "--on", "*")
             self.assertEqual(process.call_args.kwargs["timeout"], 5)
             self.assertTrue(process.call_args.kwargs["check"])
             self.assertNotIn("shell", process.call_args.kwargs)
@@ -184,48 +221,21 @@ class IdleTests(unittest.TestCase):
 
     def test_resume_never_unlocks_and_bad_action_is_rejected(self):
         idle.action("screen-on")
-        self.run.assert_called_once_with("noctalia", "msg", "dpms-on")
+        self.run.assert_called_once_with("wlopm", "--on", "*")
         with self.assertRaises(ValueError):
             idle.action("unlock")
 
-    @unittest.skipUnless(noctalia_source, "Source path not supplied")
-    def test_upstream_lock_and_suspend_contract(self):
-        # Intentional upgrade tripwires: manually re-review these contracts
-        # when upstream refactors, rather than silently losing sleep safety.
-        def source(path):
-            return (noctalia_source / "src" / path).read_text()
-
-        client = source("ipc/ipc_client.cpp")
-        self.assertIn('return (response.starts_with("error:")) ? 1 : 0;', client)
-        ipc = source("shell/session/session_ipc.cpp")
-        lock_branch = ipc.split('if (*action == "lock") {', 1)[1].split(
-            'if (*action == "lock_and_suspend") {', 1,
-        )[0]
-        self.assertIn('return "error: lock screen disabled\\n";', lock_branch)
-        self.assertIn('return "error: lock screen unavailable\\n";', lock_branch)
-        self.assertIn('if (lockScreen.lock())', lock_branch)
-        app_ipc = source("app/application_ipc.cpp")
-        self.assertIn('m_lockScreen.isActive() ? "true" : "false"', app_ipc)
-        self.assertIn('\\"locked\\"', app_ipc)
-        runner = source("shell/session/session_action_runner.cpp")
-        self.assertIn(
-            "m_lockScreen.runAfterSessionLocked([this]() { (void)requestSuspendDetached(); });",
-            runner,
-        )
-        override_branch = runner.split("if (commandOverride.has_value()) {", 1)[1].split("}", 1)[0]
-        self.assertIn("return runPowerOverride(action, *commandOverride, mode);", override_branch)
-        lock = source("shell/lockscreen/lock_screen.cpp")
-        self.assertIn("if (m_locked && m_pendingAfterLocked && allSurfacesReady())", lock)
-        self.assertIn("if (!lock()) {\n    m_pendingAfterLocked = {};", lock)
-        logind = source("dbus/logind/logind_service.cpp")
-        self.assertIn('uponSignal("PrepareForSleep")', logind)
-        self.assertIn('std::string("sleep"), std::string("noctalia"), std::string("Lock before sleep"), std::string("delay")', logind)
-        defaults = source("config/config_types.cpp").split(
-            "std::vector<IdleBehaviorConfig> defaultIdleBehaviors() {", 1,
-        )[1].split("std::vector<KeyChord>", 1)[0]
-        for name in ["lock", "screen-off", "lock-and-suspend"]:
-            self.assertIn(f'.name = "{name}"', defaults)
-        self.assertEqual(defaults.count(".enabled = false"), 3)
+    @unittest.skipUnless(hyprlock_source, "Source path not supplied")
+    def test_upstream_lock_confirmation_contract(self):
+        # Upgrade tripwire: the lock handshake reads this exact log line,
+        # printed at hyprlock's default verbosity on stdout.
+        source = (hyprlock_source / "src" / "core" / "hyprlock.cpp").read_text()
+        confirm = source.split("void CHyprlock::onLockLocked() {", 1)[1].split("}", 1)[0]
+        self.assertIn(f'Log::logger->log(Log::INFO, "{idle.LOCKED_LINE}");', confirm)
+        self.assertIn("m_sLockState.locked = true;", confirm)
+        log = (hyprlock_source / "src" / "helpers" / "Log.hpp").read_text()
+        self.assertRegex(log, r"\bINFO\s*=\s*Hyprutils::CLI::LOG_DEBUG;")
+        self.assertIn("if (level == Hyprutils::CLI::LOG_TRACE && !m_verbose)", log)
 
 
 unittest.main()
