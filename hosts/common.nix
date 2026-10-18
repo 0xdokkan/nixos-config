@@ -260,6 +260,10 @@ in
     enable = true;
     gui.enable = true;   # il default è solo daemon + CLI
   };
+  # ZeroTier: rete virtuale tra i propri pc (o con gli amici). Il demone
+  # apre da solo la porta UDP 9993; a una rete ci si unisce una volta:
+  #   sudo zerotier-cli join <id-rete>   (e la si autorizza da my.zerotier.com)
+  services.zerotierone.enable = true;
 
   # ══ Salute del disco e firmware ═════════════════════════════════════
   services.smartd.enable = true;

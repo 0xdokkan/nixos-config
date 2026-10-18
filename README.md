@@ -8,7 +8,7 @@ no guilt, just restart.
     flake.nix                  ← input (nixpkgs, home-manager, helium, llm-agents, nix-index-database), host, check, devshell, template
     hosts/
       common.nix               ← tutto ciò che è uguale sui due pc: mango+SDDM, pipewire,
-                                  utente, steam, docker, libvirt, mullvad, wireshark, font...
+                                  utente, steam, docker, libvirt, mullvad, zerotier, wireshark, font...
       armoredcoreVIP/          ← il portatile, ThinkPad T470s: Intel HD 620, thermald, batteria
       armoredcoreVIF/          ← il fisso: RTX 2070 (nvidia-open), profilo VRAM per mango
         configuration.nix      ← le differenze dell'host + `imports = [ ../common.nix ]`
@@ -553,8 +553,10 @@ I fallback Noto/emoji/simboli restano disponibili; siti e app che impongono
 un proprio font possono continuare a usarlo.
 
 **Pacchetti non liberi.** `allowUnfree = true` in `common.nix` sblocca
-discord, steam, obsidian, nvidia, claude-code. Senza, nix rifiuta di
-buildarli e ti dice il perché.
+discord, steam, obsidian, nvidia, claude-code, vintagestory. Senza, nix
+rifiuta di buildarli e ti dice il perché. Non essendo nella cache, i
+pacchetti non liberi si scaricano dal sito originale al rebuild (Vintage
+Story: circa 600 MB).
 
 **`system.stateVersion` / `home.stateVersion`.** NON è la versione del
 sistema. Dice ai moduli con dati su disco (database, formati di file)
@@ -899,6 +901,7 @@ dell'installer non serve più: il flake lo ignora, puoi cancellarlo.
 4. apri una nuova zsh: il DB per "comando non trovato → pacchetto" è già pronto
 5. apri `nvim`: lazy.nvim scarica i plugin da `dotfiles/nvim/lazy-lock.json`
 6. `mullvad account login` / login Steam / `docker run hello-world`
+   / `sudo zerotier-cli join <id-rete>` (poi autorizzi il pc dalla rete ZeroTier)
 7. da qui in poi: modifica → `sudo nixos-rebuild switch --flake ~/nixos-config#armoredcoreVIP`
 
 Note:

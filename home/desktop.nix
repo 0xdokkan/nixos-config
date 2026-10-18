@@ -77,6 +77,8 @@ in
     cava
     # dev GUI (i toolchain restano nelle devshell)
     godot
+    # giochi (steam è di sistema: hosts/common.nix)
+    vintagestory
     # file manager: nautilus = "Files" in Spotlight, com'è sul fisso (Mod+E).
     # Il file picker delle app è quello del portale gtk, non nautilus.
     # Mod+Shift+E resta la ricerca file; Mod+E apre il file manager.
