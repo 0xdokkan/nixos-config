@@ -110,45 +110,53 @@
         armoredcoreVIF = mkHost "armoredcoreVIF";   # il fisso: RTX 2070 nvidia
       };
 
-      # ── `nix flake check`: config niri, regressioni e impostazioni desktop ──
-      # niri-config è la stessa derivazione linkata da home/desktop.nix.
+      # ── `nix flake check`: config mango, regressioni e impostazioni desktop ──
+      # mango-config è la stessa derivazione linkata da home/mango.nix.
       checks.${system} = {
-        niri-config = import ./home/niri-configs.nix { inherit pkgs; };
-        niri-regressions =
+        mango-config = import ./home/mango-configs.nix { inherit pkgs; };
+        mango-regressions =
           let
-            laptopNiri = import ./home/niri-configs.nix { inherit pkgs; layout = "it,us"; };
-            # i host.kdl VERI che home-manager linka su ciascun host
-            hostKdl = host:
-              self.nixosConfigurations.${host}.config.home-manager.users.dokkan.xdg.configFile."niri/host.kdl".source;
-            softwareCursorNiri = import ./home/niri-configs.nix {
-              inherit pkgs;
-              disableCursorPlane = true;
-            };
+            # le cartelle VERE che home-manager linka su ciascun host
+            mangoDir = host:
+              self.nixosConfigurations.${host}.config.home-manager.users.dokkan.xdg.configFile."mango".source;
           in
-          pkgs.runCommand "niri-regressions-checked" {
+          pkgs.runCommand "mango-regressions-checked" {
             nativeBuildInputs = [ pkgs.python3 ];
           } ''
-            python ${./tests/niri-regressions.py} \
-              --noctalia-root ${noctaliaSource} \
-              ${self.checks.${system}.niri-config}/config.kdl \
-              ${laptopNiri}/config.kdl \
-              ${softwareCursorNiri}/config.kdl
-            python - ${self.checks.${system}.niri-config}/host.kdl \
-              ${laptopNiri}/host.kdl ${softwareCursorNiri}/host.kdl \
-              ${hostKdl "armoredcoreVIP"} ${hostKdl "armoredcoreVIF"} <<'PY'
-            import sys
-            from pathlib import Path
-            desktop, laptop, workaround, real_vip, real_vif = (
-                Path(p).read_text() for p in sys.argv[1:]
-            )
-            assert "disable-cursor-plane" not in desktop
-            assert "disable-cursor-plane" not in laptop
-            assert "disable-cursor-plane" in workaround
-            # Portatile: it + us su Mod+K (solo niri). Fisso: solo us.
-            assert 'layout "it,us"' in real_vip
-            assert 'layout "us"' in real_vif
-            assert "disable-cursor-plane" not in real_vip + real_vif
-            PY
+            python ${./tests/mango-regressions.py} \
+              --laptop ${mangoDir "armoredcoreVIP"} \
+              --desktop ${mangoDir "armoredcoreVIF"}
+            touch "$out"
+          '';
+        # La sessione: SDDM lancia il wrapper, il target esiste, keyring e
+        # PAM di hyprlock ci sono, niente niri né hypridle.
+        mango-session =
+          let
+            configs = map (host: self.nixosConfigurations.${host}.config)
+              [ "armoredcoreVIP" "armoredcoreVIF" ];
+            valid = c: let home = c.home-manager.users.dokkan; in
+              c.programs.mango.enable
+              && !c.programs.niri.enable
+              && !c.services.hypridle.enable
+              && c.services.gnome.gnome-keyring.enable
+              && c.security.pam.services ? hyprlock
+              && pkgs.lib.elem "mango" c.services.displayManager.sessionData.sessionNames
+              && home.systemd.user.targets ? mango-session
+              && pkgs.lib.elem "graphical-session.target"
+                home.systemd.user.targets.mango-session.Unit.BindsTo;
+            mango = (builtins.head configs).programs.mango.package;
+            vif = (builtins.elemAt configs 1).environment.etc;
+            nvidiaProfile = vif."nvidia/nvidia-application-profiles-rc.d/50-limit-free-buffer-pool-in-wayland-compositors.json".text;
+          in
+          assert pkgs.lib.all valid configs;
+          assert (builtins.head (builtins.fromJSON nvidiaProfile).rules).pattern.matches == "mango";
+          pkgs.runCommand "mango-session-checked" { } ''
+            desktop=${mango}/share/wayland-sessions/mango.desktop
+            grep -qx 'Exec=/nix/store/.*/bin/mango-session' "$desktop"
+            exec=$(sed -n 's/^Exec=//p' "$desktop")
+            test -x "$exec"
+            grep -q '/bin/mango "$@"' "$exec"
+            test -x ${mango}/bin/mango && test -x ${mango}/bin/mmsg
             touch "$out"
           '';
         niri-gamemode = import ./tests/gamemode.nix { inherit pkgs; };

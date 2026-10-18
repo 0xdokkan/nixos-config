@@ -14,9 +14,9 @@
 
   # ══ Tastiera italiana ═══════════════════════════════════════════════
   # Unica fonte di verità per il layout: la leggono SDDM, la console
-  # (console.useXkbConfig in common.nix) e niri (home/niri-configs.nix
-  # genera host.kdl da qui). Solo in niri si aggiunge "us" come secondo
-  # layout (home/desktop.nix): Mod+K alterna it/us.
+  # (console.useXkbConfig in common.nix) e mango (home/mango.nix genera
+  # host.conf da qui). Solo in mango si aggiunge "us" come secondo
+  # layout: Mod+K alterna it/us.
   services.xserver.xkb.layout = "it";
 
   # ══ CPU ═════════════════════════════════════════════════════════════
@@ -26,14 +26,15 @@
   hardware.graphics.extraPackages = with pkgs; [
     intel-media-driver   # VAAPI (decodifica video hw) per Gen9.5/Kaby Lake
   ];
-  # config.kdl è condiviso e già ripulito dalle env var nvidia: sul fisso
+  # La config di mango è condivisa e senza env var nvidia: sul fisso
   # quelle variabili le mette hosts/armoredcoreVIF/configuration.nix a livello di
-  # sessione, così il file niri resta uno solo ✓
+  # sessione, così la config resta una sola ✓
 
   # ══ Termiche e batteria ═════════════════════════════════════════════
   services.thermald.enable = true;
-  # UPower è condiviso in common.nix: espone anche le due batterie del T470s
-  # a Noctalia. power-profiles-daemon gestisce invece i profili energetici.
+  # UPower è condiviso in common.nix: dice all'idle se sei a batteria (le
+  # due batterie del T470s). power-profiles-daemon gestisce i profili
+  # energetici; la percentuale nella barra la legge waybar.
   # TLP: opzionale ma sui ThinkPad dà il meglio — incluse le soglie di
   # carica per la salute della batteria. Ricorda: TLP e
   # power-profiles-daemon (in common.nix) non convivono, scegline uno.

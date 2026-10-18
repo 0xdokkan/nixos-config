@@ -34,6 +34,37 @@ let
       HideCompletePassword = "false";
     };
   };
+
+  # ══ La sessione mango ════════════════════════════════════════════════
+  # Il .desktop di mango lancia solo `mango`: nessun target systemd parte
+  # e nessuno lo ferma all'uscita. Il target lo avvia la config di mango
+  # (exec-once=mango-session-start, home/mango.nix); questo wrapper fa la
+  # parte finale: quando mango esce ferma i servizi grafici (waybar,
+  # swaync, swayidle...) e pulisce l'ambiente, così il login successivo
+  # riparte da zero.
+  mangoSession = pkgs.writeShellApplication {
+    name = "mango-session";
+    runtimeInputs = [ pkgs.systemd ];
+    text = ''
+      ${pkgs.mango}/bin/mango "$@" && status=0 || status=$?
+      systemctl --user stop mango-session.target || true
+      systemctl --user unset-environment WAYLAND_DISPLAY DISPLAY \
+        MANGO_INSTANCE_SIGNATURE XDG_CURRENT_DESKTOP XDG_SESSION_TYPE || true
+      exit "$status"
+    '';
+  };
+  # Lo stesso pacchetto mango, con la voce di SDDM che passa dal wrapper.
+  mangoPackage = pkgs.symlinkJoin {
+    name = "mango-session-${pkgs.mango.version}";
+    paths = [ pkgs.mango mangoSession ];
+    postBuild = ''
+      rm $out/share/wayland-sessions/mango.desktop
+      substitute ${pkgs.mango}/share/wayland-sessions/mango.desktop \
+        $out/share/wayland-sessions/mango.desktop \
+        --replace-fail 'Exec=mango' 'Exec=${mangoSession}/bin/mango-session'
+    '';
+    passthru.providedSessions = [ "mango" ];
+  };
 in
 {
   # ══ Nix stesso ══════════════════════════════════════════════════════
@@ -119,17 +150,28 @@ in
     };
   };
 
-  # ══ Desktop: niri + Noctalia + SDDM ════════════════════════════════
-  # programs.niri porta con sé: sessione per SDDM, xdg-desktop-portal
-  # (gnome + gtk, come su Arch), gnome-keyring, xwayland-satellite.
-  programs.niri.enable = true;
+  # ══ Desktop: mango + SDDM ═══════════════════════════════════════════
+  # programs.mango porta con sé: la sessione per SDDM (qui col wrapper
+  # mango-session, vedi sopra) e i portali wlr (screenshot e condivisione
+  # schermo) + gtk (tutto il resto). XWayland è dentro mango.
+  # Barra, notifiche, lock e il resto del desktop stanno in home/ e
+  # partono con graphical-session.target.
+  programs.mango = {
+    enable = true;
+    package = mangoPackage;
+  };
 
-  # Noctalia è installato e avviato UNA volta dal modulo Home Manager
-  # home/noctalia.nix. DMS non è più installato/avviato. Non aggiungere
-  # spawn-at-startup in niri: il servizio segue graphical-session.target.
-  # Il lock nativo 5.2.1 usa lo stack PAM "login" già fornito da NixOS.
-  # UPower serve sia al widget batteria sia ai profili idle, anche sul fisso
-  # (che senza batterie viene trattato come alimentato da rete).
+  # Password, chiavi SSH e segreti delle app; si sblocca al login di SDDM.
+  # (Con niri lo accendeva programs.niri, mango non lo fa.)
+  services.gnome.gnome-keyring.enable = true;
+
+  # Lo stack PAM per hyprlock (il lock, configurato in home/). Non uso
+  # programs.hyprlock perché accenderebbe anche hypridle: l'idle lo
+  # gestiscono swayidle e home/idle.py.
+  security.pam.services.hyprlock = { };
+
+  # UPower serve ai profili idle (AC/batteria), anche sul fisso (che senza
+  # batterie viene trattato come alimentato da rete).
   services.upower.enable = true;
 
   services.displayManager.sddm = {
@@ -140,19 +182,18 @@ in
     extraPackages = with pkgs.kdePackages; [ qtsvg qtmultimedia qtvirtualkeyboard ];
   };
 
-  security.polkit.enable = true;   # Noctalia ha il suo agent, il demone è qui
+  security.polkit.enable = true;   # l'agent (polkit-gnome) è in home/, il demone è qui
   programs.dconf.enable = true;    # serve a HM dconf.settings (virt-manager)
 
-  # Il widget "power profile" del control-center Noctalia parla con questo
-  # (su Arch non c'era: il widget era vuoto). Sul portatile, se un giorno
+  # Profili energetici (powerprofilesctl). Sul portatile, se un giorno
   # attivi TLP, SPEGNI questo: sono in conflitto.
   services.power-profiles-daemon.enable = true;
 
   # Le app Electron (discord, obsidian, webcord...) in wayland nativo.
   # Sostituisce i vari ~/.config/*-flags.conf di Arch. Lo legge anche il
   # wrapper di helium.
-  # niri-session importa l'ambiente prima di avviare i servizi utente:
-  # queste variabili arrivano anche a Noctalia e alle app aperte dal launcher.
+  # mango-session-start importa l'ambiente prima di avviare i servizi
+  # utente: queste variabili arrivano anche a waybar, rofi e alle app.
   environment.sessionVariables = {
     NIXOS_OZONE_WL = "1";
     QT_QPA_PLATFORM = "wayland;xcb";
@@ -174,7 +215,6 @@ in
   };
 
   environment.systemPackages = with pkgs; [
-    xwayland-satellite   # X11 apps dentro niri
     vim
     wget
     git

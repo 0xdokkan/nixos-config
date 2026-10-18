@@ -1,4 +1,4 @@
-{ config, lib, osConfig, pkgs, ... }:
+{ config, pkgs, ... }:
 
 let
   desktopFont = "Monaspace Argon";
@@ -6,20 +6,6 @@ let
   qtFonts = {
     general = ''"${desktopFont},10"'';
     fixed = ''"${desktopFont},10"'';
-  };
-
-  # ══ niri: config.kdl + config-gaming.kdl + host.kdl validati a BUILD-TIME ══
-  # (la derivazione è in niri-configs.nix: la usa anche `checks` nel flake)
-  # osConfig = la config NixOS dell'host: da lì arriva il layout tastiera.
-  # Sul portatile niri aggiunge "us" come secondo layout (Mod+K alterna);
-  # SDDM e la console restano sul solo layout dichiarato dall'host.
-  niriConfigs = import ./niri-configs.nix {
-    inherit pkgs;
-    layout = osConfig.services.xserver.xkb.layout
-      + lib.optionalString (osConfig.networking.hostName == "armoredcoreVIP") ",us";
-    # Workaround opzionale per bug del cursore NVIDIA: scommenta SOLO se
-    # necessario. Il confronto evita di applicarlo al portatile Intel.
-    # disableCursorPlane = osConfig.networking.hostName == "armoredcoreVIF";
   };
 
   # ══ Il tema GTK del fisso: "Tokyo-Night" di HyDE (= Tokyonight-Storm di ══
@@ -36,17 +22,9 @@ let
   '';
 in
 {
-  xdg.configFile."niri/config.kdl".source        = "${niriConfigs}/config.kdl";
-  xdg.configFile."niri/config-gaming.kdl".source = "${niriConfigs}/config-gaming.kdl";
-  xdg.configFile."niri/host.kdl".source          = "${niriConfigs}/host.kdl";
+  # mango (config, sessione, script): home/mango.nix
 
-  # Gli script che config.kdl chiama (dontkillsteam.sh & co.), con exec bit
-  xdg.configFile."niri/scripts" = {
-    source = ../dotfiles/niri/scripts;
-    recursive = true;
-  };
-
-  # ══ Gli attrezzi wayland che config.kdl / gli script usano ══════════
+  # ══ Gli attrezzi wayland che i bind di mango e gli script usano ═════
   home.packages = with pkgs; [
     # screenshot pipeline (bind Mod+Ctrl+P)
     grim
@@ -76,7 +54,7 @@ in
     # (percorso assoluto nel .desktop).
     hicolor-icon-theme
 
-    # ══ Le app (da `pacman -Qe` di Arch, con le stesse config.kdl rules) ══
+    # ══ Le app (da `pacman -Qe` di Arch, regole in dotfiles/mango/rules.conf) ══
     # browser — librewolf è il default (xdg.mimeApps sotto), firefox è Mod+F,
     # helium (PDF) è sotto come programs.helium
     librewolf
@@ -100,8 +78,7 @@ in
     # dev GUI (i toolchain restano nelle devshell)
     godot
     # file manager: nautilus = "Files" in Spotlight, com'è sul fisso (Mod+E).
-    # programs.niri lo ha già come servizio nascosto per il file picker,
-    # ma senza il pacchetto qui non compare nel menu e non è nel PATH.
+    # Il file picker delle app è quello del portale gtk, non nautilus.
     # Mod+Shift+E resta la ricerca file; Mod+E apre il file manager.
     nautilus
     # archivi: ark, e nautilus li apre da lì. file-roller sarebbe l'alternativa GNOME.
@@ -153,8 +130,9 @@ in
 
   # ══ Cursore: Bibata-Modern-Ice a 20px, com'era su Arch ══════════════
   # Il modulo lo propaga ovunque in un colpo: GTK (settings.ini), Qt/X11
-  # (~/.icons/default + XCURSOR_*), e Wayland (niri, che lo legge dalle
-  # env var). Niente pacchetti tema oltre a questo: è funzionale, come le icone.
+  # (~/.icons/default + XCURSOR_*), e mango (theme.conf generato da
+  # home/mango.nix con gli stessi valori). Niente pacchetti tema oltre a
+  # questo: è funzionale, come le icone.
   home.pointerCursor = {
     enable = true;   # HM recente lo vuole esplicito (altrimenti warning)
     name = "Bibata-Modern-Ice";
@@ -216,7 +194,7 @@ in
     save_dir=${config.home.homeDirectory}/Pictures/Screenshots
     save_filename_format=%y%m%d_%Hh%Mm%Ss_screenshot.png
   '';
-  # la cartella deve esistere: la usano swappy e screenshot-path di niri
+  # la cartella deve esistere: la usano swappy e screenshot.sh
   home.file."Pictures/Screenshots/.keep".text = "";
 
   # hyprlock: NON portato — il lock è Noctalia (Mod+L).

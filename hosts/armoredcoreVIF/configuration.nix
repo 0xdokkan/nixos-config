@@ -26,7 +26,7 @@
     # obbligatorio con driver >= 560: la RTX 2070 (Turing) è supportata
     # dai moduli open, esattamente come nvidia-open-dkms su Arch
     open = true;
-    # DRM KMS: senza questo niri/wayland non partono con nvidia
+    # DRM KMS: senza questo mango/wayland non partono con nvidia
     modesetting.enable = true;
     # nvidia-settings (GUI)
     nvidiaSettings = true;
@@ -44,9 +44,9 @@
     nvidia-vaapi-driver   # VAAPI via NVDEC (era l'extension flatpak su Arch)
   ];
 
-  # ══ Le env var nvidia che erano nel config.kdl di Hyprland/HyDE ═════
-  # config.kdl è condiviso col portatile e non le ha più: qui le mettiamo
-  # nella sessione utente, così niri e tutto ciò che lancia le ereditano.
+  # ══ Le env var nvidia che erano nella config di Hyprland/HyDE ═══════
+  # La config di mango è condivisa col portatile e non le ha: qui le
+  # mettiamo nella sessione utente, così mango e ciò che lancia le ereditano.
   # GBM_BACKEND e __GLX_VENDOR_LIBRARY_NAME non servono più con i driver
   # recenti (GBM e glvnd trovano nvidia da soli) e GBM_BACKEND è il primo
   # sospettato quando Firefox/Electron crashano: rimettile solo se servono.
@@ -55,17 +55,18 @@
     __GL_VRR_ALLOWED = "1";
   };
 
-  # ══ niri su NVIDIA: VRAM ════════════════════════════════════════════
+  # ══ mango su NVIDIA: VRAM ═══════════════════════════════════════════
   # Il driver non restituisce al pool la VRAM liberata dai compositor
-  # Wayland: niri arriva verso 1 GiB invece di ~100 MiB (controlla con
-  # nvtop). NVIDIA ha già un profilo "No VidMem Reuse" per Hyprland, kwin,
-  # mutter, wlroots, Xwayland... ma non per niri: questo è il fix della
-  # wiki di niri (docs/wiki/Nvidia.md).
+  # Wayland: un compositor arriva verso 1 GiB invece di ~100 MiB
+  # (controlla con nvtop). NVIDIA ha già un profilo "No VidMem Reuse" per
+  # Hyprland, kwin, mutter, Xwayland... scelti per nome del processo, e
+  # "mango" non c'è: è lo stesso fix che serviva a niri (la sua wiki,
+  # docs/wiki/Nvidia.md), con il nome di mango.
   environment.etc."nvidia/nvidia-application-profiles-rc.d/50-limit-free-buffer-pool-in-wayland-compositors.json".text =
     builtins.toJSON {
       rules = [
         {
-          pattern = { feature = "procname"; matches = "niri"; };
+          pattern = { feature = "procname"; matches = "mango"; };
           profile = "Limit Free Buffer Pool On Wayland Compositors";
         }
       ];
@@ -77,10 +78,9 @@
       ];
     };
 
-  # NIRI_DISABLE_HARDWARE_CURSORS non è un'opzione di niri.
-  # Se il cursore dà problemi, abilita il workaround KDL disable-cursor-plane
-  # SOLO per questo host: vedi il parametro commentato in home/desktop.nix.
-  # Di default resta disabilitato: non tutti i sistemi NVIDIA ne hanno bisogno.
+  # Se il cursore dà problemi (sparisce o lascia scie), mango è wlroots:
+  # aggiungi WLR_NO_HARDWARE_CURSORS = "1" alle sessionVariables qui sopra.
+  # Di default no: non tutti i sistemi NVIDIA ne hanno bisogno.
 
   # ══ NON TOCCARE MAI ═════════════════════════════════════════════════
   # Marcatore di compatibilità per i dati stateful, NON una versione da
