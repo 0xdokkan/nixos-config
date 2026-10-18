@@ -20,6 +20,7 @@ no guilt, just restart.
       noctalia-idle.nix        ← profili idle batteria/alimentazione e sospensione sicura
       niri-configs.nix         ← `niri validate`, layout per-host e workaround cursore opzionale
       shell.nix                ← zsh + p10k + alias + CLI belt
+      fastfetch-spin.{nix,py,sh} ← il fiocco NixOS 3D che gira in `fastfetch`
       dev.nix                  ← git/gh, direnv, neovim (LazyVim), agenti AI, .gdbinit
       maintenance.nix          ← installa nixup per il repository e l'host corretti
       nixup.nix + nixup.sh     ← update, check, build, confronto pacchetti e conferma
@@ -33,7 +34,7 @@ no guilt, just restart.
       nvim/                    ← LazyVim (symlink live: lazy-lock.json resta scrivibile)
       noctalia/palettes/       ← Tokyo Night Storm, varianti dark e light
       cava/config              ← il gradiente
-      fastfetch/               ← config.jsonc + images/ (le immagini del logo vanno qui)
+      fastfetch/               ← config.jsonc (moduli; il logo è il fiocco 3D) + images/
       gtk/Tokyo-Night/         ← il tema GTK di HyDE (Tokyonight-Storm): nautilus & co.
                                   come sul fisso. Vendorizzato: nixpkgs l'ha rimosso
     templates/{c,rust,zig,python}/
@@ -546,31 +547,45 @@ Persa una macchina? Togli la sua riga, rebuild, e quella chiave è morta.
 
 ## fastfetch: come si gestisce
 
-Tutto in `dotfiles/fastfetch/`: `config.jsonc` (layout e moduli) e
-`images/` (le immagini del logo). `home/shell.nix` genera la config vera
-sostituendo `@IMAGES@` con il percorso della cartella nello store.
+Tutto in `dotfiles/fastfetch/config.jsonc` (layout e moduli);
+`home/shell.nix` genera la config vera sostituendo i segnaposto `@LOGO@`
+e `@IMAGES@` con i percorsi nello store.
 
-**Cambiare immagine.** Copia il file in `images/`, poi nel jsonc:
+**Il fiocco 3D.** `fastfetch` senza argomenti, in un terminale, fa girare
+il logo NixOS in 3D accanto alle info: due giri, poi si ferma di fronte.
+Un tasto qualsiasi salta al fotogramma finale. Varianti:
 
-    "source": "@IMAGES@/pikachu.png",     // il nome del TUO file
-    "width": 30, "height": 15,            // dimensioni in celle del terminale
+    FASTFETCH_SPIN=loop fastfetch   # gira finché non premi un tasto
+    FASTFETCH_SPIN=off fastfetch    # fermo, come fastfetch normale
+    fastfetch --qualsiasi-opzione   # con argomenti: fastfetch normale
 
-`git add` (i flake vedono solo file tracciati!), rebuild. Le immagini si
-vedono solo in kitty; in tty o via ssh fastfetch ripiega sul fiocco ASCII.
+Da fermo (con argomenti, in una pipe, in un terminale troppo basso) il logo
+è lo stesso fiocco, nel fotogramma frontale. Come funziona: il fiocco è la
+geometria vera dell'SVG ufficiale (`nixos-icons`), sei lambda estrusi in
+un solido. `home/fastfetch-spin.py` lo illumina e lo trasforma in caratteri
+ASCII con i colori Tokyo Night (blu `#7aa2f7` e `#2ac3de`) **al build**, per
+72 angolazioni. `home/fastfetch-spin.sh` (il `fastfetch` nel PATH) le
+ristampa accanto all'output di fastfetch vero. Dimensioni, numero di
+fotogrammi, giri e durata stanno in `home/fastfetch-spin.nix`.
 
-**Tornare al logo ASCII.** Nel blocco `"logo"`: `"type": "builtin"` e
-togli `source`. Oppure `"source": "arch"` per ridere.
+**Tornare a un'immagine.** Copia il file in `images/`, nel jsonc sostituisci
+`@LOGO@` con il blocco d'esempio scritto nel commento in cima (usa
+`"@IMAGES@/tuo-file.png"`) e togli `programs.fastfetch.package` da
+`home/shell.nix`. `git add` (i flake vedono solo file tracciati!), rebuild.
+Le immagini si vedono solo in kitty; in tty o via ssh fastfetch ripiega sul
+fiocco ASCII classico.
 
 **Moduli.** La lista `"modules"` è l'ordine delle righe. Nomi con
 `fastfetch --list-modules`; un modulo si configura come oggetto, es.
 `{ "type": "disk", "folders": "/" }`. Riferimento:
 https://github.com/fastfetch-cli/fastfetch/wiki/Configuration
 
-**Provare senza rebuild.** Il jsonc è JSON con commenti, fastfetch lo
-legge anche direttamente (ma con `@IMAGES@` non sostituito: usa un
-percorso assoluto per il test):
+**Provare senza rebuild.** Il jsonc del repo da solo non è valido (`@LOGO@`
+diventa JSON solo al build). Dopo `git add`, costruisci la config generata
+e passala a fastfetch (con argomenti, quindi logo fermo):
 
-    fastfetch --config ~/nixos-config/dotfiles/fastfetch/config.jsonc
+    nix build '.#nixosConfigurations.armoredcoreVIP.config.home-manager.users.dokkan.xdg.configFile."fastfetch/config.jsonc".source'
+    fastfetch --config ./result
 
 **All'apertura del terminale?** Oggi parte `pokemon-colorscripts`
 (dotfiles/zsh/extra.zsh). Per fastfetch al suo posto, o in aggiunta,
@@ -620,7 +635,8 @@ le librerie effettivamente richieste dal progetto. Vedi la
     # niri validate (normale/gaming, layout us/it, workaround cursore),
     # privacy/scratch + namespace/IPC Noctalia, toggle gaming con IPC simulato,
     # LazyVim/Mason e nixup con comandi simulati, UPower e font GTK/Qt/fontconfig,
-    # Noctalia: schema/palette reali, ricerca file, luce notturna e profili idle
+    # Noctalia: schema/palette reali, ricerca file, luce notturna e profili idle,
+    # fiocco 3D di fastfetch (fotogrammi, player in un pty, config vera)
     # NB: i flake vedono SOLO i file tracciati da git → `git add` prima
     nix flake check
 

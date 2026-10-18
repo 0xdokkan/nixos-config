@@ -1,5 +1,8 @@
 { config, pkgs, ... }:
 
+let
+  fastfetchSpin = import ./fastfetch-spin.nix { inherit pkgs; };
+in
 {
   # ══ zsh — casa tua, come su Arch ════════════════════════════════════
   programs.zsh = {
@@ -51,16 +54,18 @@
     # gli alias li definisce extra.zsh (come su Arch), non HM
     enableZshIntegration = false;
   };
-  # fastfetch: config in dotfiles/fastfetch/config.jsonc, immagini in
-  # dotfiles/fastfetch/images/ (finiscono nello store: il placeholder
-  # @IMAGES@ nel jsonc viene sostituito col percorso vero a build-time).
-  # Per cambiare immagine: copia il file in images/, aggiorna "source" nel
-  # jsonc, rebuild. Le immagini vengono renderizzate solo in kitty (kitty
-  # graphics protocol); altrove fastfetch ripiega sul logo ASCII.
-  programs.fastfetch.enable = true;
+  # fastfetch: config in dotfiles/fastfetch/config.jsonc. Il logo è il
+  # fiocco NixOS 3D di fastfetch-spin.nix: `fastfetch` senza argomenti lo
+  # fa girare, altrimenti è il logo statico (@LOGO@ nel jsonc). Le immagini
+  # restano in dotfiles/fastfetch/images/ (@IMAGES@, vedi il commento lì).
+  programs.fastfetch = {
+    enable = true;
+    package = fastfetchSpin;
+  };
   xdg.configFile."fastfetch/config.jsonc".source =
     pkgs.replaceVars ../dotfiles/fastfetch/config.jsonc {
       IMAGES = "${../dotfiles/fastfetch/images}";
+      LOGO = builtins.toJSON fastfetchSpin.logo;
     };
   programs.yazi.enable = true;   # la zsh integration genera la funzione `y`
 

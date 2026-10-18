@@ -204,6 +204,25 @@
           touch "$out"
         '';
         lazyvim-nix = import ./tests/lazyvim-nix.nix { inherit pkgs; };
+        # Il fiocco 3D di fastfetch: fotogrammi e player in un pty, con un
+        # fastfetch finto. Più la config vera: il logo statico è lo stesso.
+        fastfetch-spin = import ./tests/fastfetch-spin.nix { inherit pkgs; };
+        fastfetch-config =
+          let
+            home = self.nixosConfigurations.armoredcoreVIP.config.home-manager.users.dokkan;
+            spin = home.programs.fastfetch.package;
+          in
+          pkgs.runCommand "fastfetch-config-checked" { } ''
+            # fastfetch vero: fallisce se @LOGO@ ha rotto il JSON.
+            ${spin.unwrapped}/bin/fastfetch --pipe false --structure Break \
+              --config ${home.xdg.configFile."fastfetch/config.jsonc".source} > raw
+            strip() { sed -e 's/\x1b\[[0-9;?]*[A-Za-z]//g' -e 's/[[:space:]]*$//' "$1"; }
+            strip ${spin.logo.source} | grep -v '^$' > logo
+            strip raw > shown
+            # tutte le righe del fiocco statico compaiono nell'output
+            test "$(grep -cFf logo shown)" -ge "$(wc -l < logo)"
+            touch "$out"
+          '';
         nixup = import ./tests/nixup.nix { inherit pkgs; };
         # Costruisce il wrapper vero: writeShellApplication esegue ShellCheck.
         # Il comando non viene avviato, quindi nessun update/switch nei test.
