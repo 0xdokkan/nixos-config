@@ -13,6 +13,12 @@ let
     cursor = { inherit (config.home.pointerCursor) name size; };
   };
 
+  # Gli script dei bind (dotfiles/mango/scripts), nel PATH per nome.
+  scripts = import ./mango-scripts.nix {
+    inherit pkgs;
+    rofi = config.programs.rofi.finalPackage;
+  };
+
   # exec-once della config: porta l'ambiente di mango (WAYLAND_DISPLAY,
   # DISPLAY, MANGO_INSTANCE_SIGNATURE e quello del login) a systemd e
   # dbus, POI avvia il target. Nell'ordine inverso i servizi partirebbero
@@ -31,7 +37,24 @@ in
   # Tutta la cartella: i file si includono a vicenda con path relativi.
   xdg.configFile."mango".source = mangoConfigs;
 
-  home.packages = [ sessionStart ];
+  home.packages = [ sessionStart ] ++ lib.attrValues scripts;
+
+  # Sfondo al login: l'ultimo scelto con wallpaper.sh o, la prima volta,
+  # quello di serie (dotfiles/sddm/bg.png). awww-daemon da solo ricorda
+  # l'ultima immagine, ma solo se la sua cache c'è.
+  systemd.user.services.wallpaper = {
+    Unit = {
+      Description = "Sfondo del desktop (wallpaper.sh restore)";
+      PartOf = [ "graphical-session.target" ];
+      After = [ "graphical-session.target" "awww.service" ];
+      Wants = [ "awww.service" ];
+    };
+    Service = {
+      Type = "oneshot";
+      ExecStart = "${lib.getExe scripts."wallpaper.sh"} restore";
+    };
+    Install.WantedBy = [ "graphical-session.target" ];
+  };
 
   # Il target della sessione: tira su graphical-session.target, a cui sono
   # legati tutti i servizi del desktop (waybar, swaync, swayidle...).

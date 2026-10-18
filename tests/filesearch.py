@@ -1,4 +1,4 @@
-"""Exercise file selection without a running Noctalia or opening user files."""
+"""Exercise file selection without a running rofi or opening user files."""
 
 import json
 import os
@@ -16,8 +16,8 @@ if name == 'fd':
     assert sys.argv[1:] == ['--type', 'f', '--type', 'd', '--absolute-path', '--print0', '.', str(root / 'home')]
     sys.stdout.buffer.write(bytes.fromhex(os.environ['FILESEARCH_TEST_CANDIDATES']))
     sys.exit(int(os.environ.get('FILESEARCH_TEST_FD_STATUS', '0')))
-elif name == 'noctalia':
-    assert sys.argv[1:3] == ['dmenu', '--prompt']
+elif name == 'rofi':
+    assert sys.argv[1:] == ['-dmenu', '-i', '-no-custom', '-p', 'file'], sys.argv
     (root / 'choices').write_text(sys.stdin.read())
     print(os.environ.get('FILESEARCH_TEST_SELECTION', ''))
     sys.exit(int(os.environ.get('FILESEARCH_TEST_PICKER_STATUS', '0')))
@@ -35,7 +35,7 @@ def main(script: Path) -> None:
         task_home.mkdir()
         bindir = root / "bin"
         bindir.mkdir()
-        for name in ("fd", "noctalia", "xdg-open"):
+        for name in ("fd", "rofi", "xdg-open"):
             stub = bindir / name
             stub.write_text(f"#!{sys.executable}\n{STUB}")
             stub.chmod(0o755)
@@ -71,7 +71,7 @@ def main(script: Path) -> None:
             assert (root / "opened").exists() == opened, selection
             if opened:
                 assert json.loads((root / "opened").read_text()) == [selection]
-            assert not list(root.glob("noctalia-files.*")), "candidate list was not cleaned up"
+            assert not list(root.glob("filesearch.*")), "candidate list was not cleaned up"
             assert not (root / "SHOULD_NOT_EXIST").exists(), "filename was executed"
 
         for candidate in candidates:

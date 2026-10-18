@@ -23,7 +23,7 @@ in
   };
 
   # Sfondo con transizioni (wallpaper.sh: Mod+Alt+←/→, Mod+Shift+W).
-  # Al login awww rimette da solo l'ultimo sfondo.
+  # Al login lo rimette il servizio wallpaper (home/mango.nix).
   services.awww.enable = true;
 
   # Dischi removibili: notifica e voce per montarli, niente automount.

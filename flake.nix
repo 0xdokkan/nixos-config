@@ -137,7 +137,14 @@
             test -x ${mango}/bin/mango && test -x ${mango}/bin/mmsg
             touch "$out"
           '';
-        niri-gamemode = import ./tests/gamemode.nix { inherit pkgs; };
+        # Gli script dei bind: ShellCheck, comandi finti, nessuno mancante.
+        # gamemode e filesearch hanno i loro test, più vecchi e più fitti.
+        mango-scripts = import ./tests/mango-scripts.nix {
+          inherit pkgs;
+          scripts = import ./home/mango-scripts.nix { inherit pkgs; };
+          home = self.nixosConfigurations.armoredcoreVIP.config.home-manager.users.dokkan;
+        };
+        mango-gamemode = import ./tests/gamemode.nix { inherit pkgs; };
         # idle.py con bus, locker e power manager simulati, più il controllo
         # sulla riga con cui hyprlock conferma il lock.
         idle = import ./tests/idle.nix { inherit pkgs; };
@@ -171,6 +178,8 @@
               && home.services.batsignal.enable == laptop c
               && boundToSession home.systemd.user.services.idle
               && boundToSession home.systemd.user.services.wl-gammarelay-rs
+              && boundToSession home.systemd.user.services.wallpaper
+              && pkgs.lib.elem "wallpaper.sh" (map (p: p.meta.mainProgram or "") home.home.packages)
               && home.systemd.user.services.hyprlock.Unit.X-RestartIfChanged == false
               && !(home.systemd.user.services.hyprlock ? Install)
               && home.xdg.desktopEntries ? wifi-qr
@@ -217,10 +226,10 @@
             if grep -qi 'config error' hyprlock.log; then exit 1; fi
             touch "$out"
           '';
-        noctalia-filesearch = pkgs.runCommand "noctalia-filesearch-checked" {
+        filesearch = pkgs.runCommand "filesearch-checked" {
           nativeBuildInputs = [ pkgs.python3 pkgs.bash pkgs.coreutils pkgs.gnugrep ];
         } ''
-          python ${./tests/filesearch.py} ${./dotfiles/niri/scripts/filesearch.sh}
+          python ${./tests/filesearch.py} ${./dotfiles/mango/scripts/filesearch.sh}
           touch "$out"
         '';
         lazyvim-nix = import ./tests/lazyvim-nix.nix { inherit pkgs; };
