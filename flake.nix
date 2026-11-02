@@ -278,6 +278,29 @@
           repoPath = "/home/dokkan/nixos-config";
           hostName = "armoredcoreVIP";
         };
+        # Codex alpha: lo script del pin con GitHub e Nix simulati, e il
+        # pacchetto vero alla versione del pin (lo scarica: è lo stesso del
+        # rebuild). La home di entrambi gli host deve usare proprio lui.
+        codex-alpha =
+          let
+            codex = import ./home/codex-alpha.nix {
+              pkgs = self.nixosConfigurations.armoredcoreVIP.pkgs;
+            };
+            homes = map (host: self.nixosConfigurations.${host}.config.home-manager.users.dokkan)
+              [ "armoredcoreVIP" "armoredcoreVIF" ];
+            usesAlpha = home: pkgs.lib.any
+              (p: (p.name or "") == "codex-keep-awake" && map toString (p.paths or [ ]) == [ codex.outPath ])
+              home.home.packages;
+          in
+          assert pkgs.lib.all usesAlpha homes;
+          pkgs.runCommand "codex-alpha-checked" {
+            nativeBuildInputs = [ pkgs.python3 pkgs.bash pkgs.coreutils pkgs.jq ];
+          } ''
+            export PYTHONDONTWRITEBYTECODE=1 HOME=$TMPDIR
+            python ${./tests/codex-alpha.py} ${./home/codex-alpha-update.sh}
+            ${codex}/bin/codex --version | grep -qF ${pkgs.lib.escapeShellArg codex.version}
+            touch "$out"
+          '';
         nix-index-integration =
           let
             homes = map (host: self.nixosConfigurations.${host}.config.home-manager.users.dokkan)

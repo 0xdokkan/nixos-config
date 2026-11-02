@@ -29,6 +29,8 @@ no guilt, just restart.
       shell.nix                ← zsh + p10k + alias + CLI belt
       fastfetch-spin.{nix,py,sh} ← il fiocco NixOS 3D che gira in `fastfetch`
       dev.nix                  ← git/gh, direnv, neovim (LazyVim), agenti AI, .gdbinit
+      codex-alpha.{nix,json}   ← Codex CLI dal canale alpha: pacchetto e pin (versione, hash)
+      codex-alpha-update.sh    ← porta il pin all'ultima release (lo lancia nixup)
       maintenance.nix          ← installa nixup per il repository e l'host corretti
       nixup.nix + nixup.sh     ← update, check, build, confronto pacchetti e conferma
     dotfiles/
@@ -53,7 +55,8 @@ no guilt, just restart.
       flake.nix + .envrc       ← il boilerplate che il template copia nel progetto
     tests/                     ← i check del flake, senza sessione grafica: bind e config di
                                   mango, script con comandi finti, idle/lock, LazyVim/Mason,
-                                  nixup con Nix/sudo simulati, fiocco di fastfetch
+                                  nixup con Nix/sudo simulati, pin di Codex alpha con
+                                  GitHub finto, fiocco di fastfetch
       desktop-preview.nix      ← mango vero in una VM, con screenshot (non è un check)
 
 ## Come funziona Nix (per chi arriva da pacman)
@@ -96,7 +99,7 @@ quelle revisioni; non cerca automaticamente le ultime versioni.
 Il comando assistito, disponibile dopo il rebuild che lo installa, è:
 
     nixup          # aggiorna tutti gli input, controlla e propone il rebuild
-    nixup ai       # aggiorna soltanto llm-agents
+    nixup ai       # aggiorna soltanto le app AI (llm-agents e Codex alpha)
     nixup apply    # controlla e propone il rebuild con il lock già presente
 
 Si lancia da qualsiasi cartella, come utente normale: il pacchetto sa
@@ -155,17 +158,31 @@ applicazioni. `system.stateVersion`/`home.stateVersion` non vanno cambiati
 per aggiornare i pacchetti. Plugin Neovim, tool Mason e progetti con un
 proprio lock restano aggiornamenti separati.
 
-**Aggiornare solo le app AI.** Claude Code, Codex CLI, Claude Desktop e
+**Aggiornare solo le app AI.** Claude Code, Claude Desktop e
 ChatGPT/Codex desktop arrivano da
 [numtide/llm-agents.nix](https://github.com/numtide/llm-agents.nix), con
-packaging aggiornato giornalmente. Seguono le release pubblicate, non
-build dal ramo di sviluppo; può esserci un ritardo rispetto a upstream.
-OpenCode resta nel nixpkgs del sistema, come prima.
+packaging aggiornato da un bot. Seguono le release pubblicate, non
+build dal ramo di sviluppo: Claude Code segue il canale `latest` (più
+avanti di `stable`), con qualche ora di ritardo rispetto a upstream (a
+fine ottobre 2026 da 3 a 24 ore). OpenCode resta nel nixpkgs del
+sistema, come prima.
+
+**Codex CLI segue il canale alpha** (`home/codex-alpha.nix`): il pacchetto
+ufficiale precompilato della release pubblicata per ultima su GitHub,
+alpha o stabile, invece della stabile compilata da llm-agents. Versione,
+URL e hash stanno in `home/codex-alpha.json`, che `nixup` e `nixup ai`
+aggiornano subito dopo il lock (`home/codex-alpha-update.sh`). Le alpha
+escono anche più volte al giorno e possono rompersi: per tornare alla
+stabile, in `home/dev.nix` rimetti `(keepAwake aiPackages.codex "codex")`.
+Rispetto a llm-agents mancano le sue patch Nix: il demone app-server, se
+lo usi, si installa e si aggiorna da solo in `~/.codex`. Ogni versione
+occupa circa 500 MiB nello store, finché la gc settimanale non la toglie.
 
 Con il comando assistito basta `nixup ai`; manualmente:
 
     cd ~/nixos-config
     nix flake update llm-agents
+    nix shell nixpkgs#curl nixpkgs#jq -c bash home/codex-alpha-update.sh
     sudo nixos-rebuild switch --flake .#armoredcoreVIP
 
 Sul fisso usa `#armoredcoreVIF`. Il rebuild da solo NON cerca nuove
@@ -781,7 +798,7 @@ le librerie effettivamente richieste dal progetto. Vedi la
 
     # aggiornamento assistito, sul sistema NixOS installato:
     nixup            # tutti gli input, diff e conferma prima dello switch
-    nixup ai         # soltanto llm-agents
+    nixup ai         # soltanto le app AI (llm-agents e Codex alpha)
     nixup apply      # stesso lock, anche dopo pull o annullamento
 
     # arsenale CTF ovunque:
@@ -968,5 +985,7 @@ Note:
 - Il repo DEVE stare in `~/nixos-config`: la config nvim è un symlink
   live lì dentro (strategia B in `home/dev.nix`).
 - Agenti AI: CLI e app desktop sono dichiarati in `home/dev.nix`.
-  Claude Code, Codex, Claude Desktop e ChatGPT/Codex desktop usano
-  `llm-agents`; OpenCode resta in nixpkgs. Vedi "Aggiornare solo le app AI".
+  Claude Code, Claude Desktop e ChatGPT/Codex desktop usano `llm-agents`;
+  Codex CLI segue il canale alpha con i binari ufficiali di GitHub
+  (`home/codex-alpha.nix`); OpenCode resta in nixpkgs. Vedi "Aggiornare
+  solo le app AI".

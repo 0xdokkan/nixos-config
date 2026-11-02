@@ -98,7 +98,10 @@ in
     # Release dal flake llm-agents, non dal nixpkgs del sistema.
     # Il wrapper anti-sospensione resta valido anche dopo gli aggiornamenti.
     (keepAwake aiPackages.claude-code "claude")
-    (keepAwake aiPackages.codex "codex")
+    # Codex invece segue il canale alpha, con i binari ufficiali di GitHub
+    # (codex-alpha.nix). Per tornare alla stabile di llm-agents:
+    #   (keepAwake aiPackages.codex "codex")
+    (keepAwake (import ./codex-alpha.nix { inherit pkgs; }) "codex")
     aiPackages.claude-desktop
     # La preview ufficiale usa XWayland: il supporto Wayland nativo è
     # sperimentale. Questo flag prevale su quello aggiunto per NIXOS_OZONE_WL.

@@ -41,6 +41,11 @@ def stub(tool, args):
         if len(args) != 3 or args[0] != "diff":
             raise AssertionError(f"Unexpected nvd invocation: {args}")
         stage = "diff"
+    elif tool == "pin-update":
+        # The Codex alpha pin updater: no arguments, run from the repository.
+        if args:
+            raise AssertionError(f"Unexpected pin updater invocation: {args}")
+        stage = "pins"
     elif tool != "sudo":
         raise AssertionError(f"Unexpected tool: {tool}")
 
@@ -115,7 +120,9 @@ class Case:
         stub_dir = self.root / "stub commands"
         stub_dir.mkdir()
         test_script = str(Path(__file__).resolve())
-        for name in ("nix", "nvd", "sudo", "uname"):
+        # Opt-in per test: the default fixture has no pin updater configured.
+        self.pin_update = {"NIXUP_PIN_UPDATE": str(stub_dir / "pin-update")}
+        for name in ("nix", "nvd", "sudo", "uname", "pin-update"):
             executable = stub_dir / name
             executable.write_text(
                 f"#!{sys.executable}\n"
@@ -272,6 +279,27 @@ def tests(script, snapshot, rebuild_source):
             case.assert_snapshot()
             if mode == "apply":
                 assert_rebuild_entrypoint(case, rebuild_source)
+
+    # The Codex alpha pin follows the lock: refreshed right after the input
+    # update in all/ai, from the repository root, never in apply; a failure
+    # stops before anything is checked or built.
+    for mode in ("all", "ai"):
+        with fixture("pins " + mode) as case:
+            result = case.run(mode, overrides=case.pin_update)
+            case.assert_success(result)
+            expected = ["update", "pins", "metadata", "check", "build", "diff", "sudo"]
+            assert case.stages() == expected, (case.stages(), result.stdout, result.stderr)
+            assert case.events()[1]["cwd"] == str(case.repo.resolve()), case.events()[1]
+            case.assert_snapshot()
+
+    with fixture("pins apply") as case:
+        case.assert_success(case.run("apply", overrides=case.pin_update))
+        assert "pins" not in case.stages(), case.stages()
+        case.assert_snapshot()
+
+    with fixture("pins failure") as case:
+        case.assert_failure(case.run("ai", fail="pins", overrides=case.pin_update))
+        assert case.stages() == ["update", "pins"], case.stages()
 
     for response in ("no\n", "\n", "", "maybe\n"):
         with fixture("decline") as case:

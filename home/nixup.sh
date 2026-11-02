@@ -6,8 +6,8 @@ set -euo pipefail
 usage() {
     printf '%s\n' \
         'Uso: nixup [all|ai|apply]' \
-        '  all    aggiorna tutti gli input (default), verifica e mostra il diff' \
-        '  ai     aggiorna soltanto llm-agents, verifica e mostra il diff' \
+        '  all    aggiorna tutti gli input e Codex alpha (default), verifica e mostra il diff' \
+        '  ai     aggiorna soltanto le app AI (llm-agents e Codex alpha), verifica e mostra il diff' \
         '  apply  usa il lock e le modifiche già presenti, senza aggiornare input' \
         'Il sistema cambia soltanto dopo conferma. Niente pull, commit o push automatici.'
 }
@@ -60,12 +60,17 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 
 printf 'Repository: %s\nHost: %s\nModalità: %s\n' "$repo" "$NIXUP_HOST" "$mode"
-printf '%s\n' 'Il flake.lock aggiornato resta nel repository anche in caso di errore o annullamento.'
+printf '%s\n' 'Il flake.lock (e il pin di Codex) aggiornati restano nel repository anche in caso di errore o annullamento.'
 case "$mode" in
     all) nix flake update ;;
     ai) nix flake update llm-agents ;;
     apply) printf '%s\n' 'Uso gli input già bloccati, senza cercare aggiornamenti.' ;;
 esac
+# Codex dal canale alpha non è un input del flake: il suo pin lo aggiorna
+# uno script a parte, nello stesso momento e con le stesse regole del lock.
+if [[ "$mode" != apply && -n "${NIXUP_PIN_UPDATE:-}" ]]; then
+    "$NIXUP_PIN_UPDATE"
+fi
 
 # Check, build e attivazione devono usare lo STESSO snapshot immutabile:
 # una modifica dal desktop/editor mentre si guarda il diff non deve cambiare
