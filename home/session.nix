@@ -10,6 +10,14 @@ in
   # Finestra della password per le azioni da amministratore (polkit).
   services.polkit-gnome.enable = true;
 
+  # Agente SSH: gcr-ssh-agent (con gnome-keyring, hosts/common.nix) gira,
+  # ma mango parte da SDDM e non da systemd, quindi kitty e zsh non
+  # ricevono SSH_AUTH_SOCK e `ssh-add` non trova l'agente. Vale dal
+  # login successivo.
+  home.sessionVariables = lib.mkIf osConfig.services.gnome.gcr-ssh-agent.enable {
+    SSH_AUTH_SOCK = "$XDG_RUNTIME_DIR/gcr/ssh";
+  };
+
   # Cronologia appunti (Mod+V): cliphist la registra, wl-clip-persist
   # tiene vivo l'ultimo copiato anche quando l'app che l'ha copiato si chiude.
   services.cliphist = {

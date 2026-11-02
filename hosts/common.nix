@@ -65,6 +65,24 @@ let
     '';
     passthru.providedSessions = [ "mango" ];
   };
+
+  # ══ La chiave dei segreti di libvirt, senza TPM ══════════════════════
+  # libvirt la crea con `systemd-creds encrypt` e i default: se c'è un
+  # TPM, la chiave resta legata al TPM. Basta il Security Chip spento o
+  # un aggiornamento del BIOS (cambiano i PCR) e libvirtd non parte più
+  # (status=243/CREDENTIALS: successo sul T470s dal 24 ottobre 2026, e
+  # ogni switch finiva con "failed (status 4)"). Questa versione usa
+  # solo la chiave dell'host in /var/lib/systemd/credential.secret.
+  # In /var/lib/libvirt/secrets c'era solo la chiave, nessun segreto:
+  # legarla al TPM non proteggeva niente e rendeva fragile libvirtd.
+  # Il check system-baseline nel flake controlla che l'unità upstream
+  # scriva ancora lo stesso file con lo stesso nome.
+  libvirtSecretKey = pkgs.writeShellScript "virt-secret-init-encryption-host-key" ''
+    set -o errexit -o nounset -o pipefail
+    ${pkgs.coreutils}/bin/dd if=/dev/random status=none bs=32 count=1 \
+      | ${config.systemd.package}/bin/systemd-creds encrypt --with-key=host \
+          --name=secrets-encryption-key - /var/lib/libvirt/secrets/secrets-encryption-key
+  '';
 in
 {
   # ══ Nix stesso ══════════════════════════════════════════════════════
@@ -76,6 +94,10 @@ in
   nix.settings.extra-trusted-public-keys = [
     "niks3.numtide.com-1:DTx8wZduET09hRmMtKdQDxNNthLQETkc/yaX7M4qK0g="
   ];
+  # Il sistema viene dal flake: il canale "nixos" che l'installer lascia
+  # a root è vecchio e nessuno lo usa. `nix-shell -p` e `nixpkgs#...`
+  # puntano già al nixpkgs del flake.lock (registry e NIX_PATH).
+  nix.channel.enable = false;
 
   # ══ Pulizia automatica dello store ══════════════════════════════════
   # Ogni rebuild lascia la generazione precedente (è il rollback). Senza
@@ -99,6 +121,11 @@ in
   # Nel menu di boot al massimo 10 generazioni: il file /boot è piccolo (1 GB)
   # e ogni voce porta con sé kernel + initrd. La gc sopra fa il resto.
   boot.loader.systemd-boot.configurationLimit = 10;
+  # Niente modifica della riga del kernel dal menu: con l'editor acceso
+  # (il default di NixOS) basta aggiungere init=/bin/sh per avere una
+  # shell root senza password. Il rollback resta: si sceglie una
+  # generazione dal menu, non serve modificarla.
+  boot.loader.systemd-boot.editor = false;
 
   # ══ Rete (l'hostName è per-host) ════════════════════════════════════
   networking.networkmanager.enable = true;
@@ -163,6 +190,11 @@ in
   # (Con niri lo accendeva programs.niri, mango non lo fa.)
   services.gnome.gnome-keyring.enable = true;
 
+  # gvfs per Nautilus: Cestino, telefoni (MTP), smb:// e sftp://. Senza,
+  # il Cestino nella barra laterale non si apre e "Altre posizioni" non
+  # monta niente.
+  services.gvfs.enable = true;
+
   # Lo stack PAM per hyprlock (il lock, configurato in home/). Non uso
   # programs.hyprlock perché accenderebbe anche hypridle: l'idle lo
   # gestiscono swayidle e home/idle.py.
@@ -216,8 +248,13 @@ in
     vim
     wget
     git
+    man-pages            # man 2 open, man 3 printf: syscall e libc
+    man-pages-posix      # man 3p ...: le pagine POSIX
     sddmTheme            # SDDM cerca i temi in /run/current-system/sw/share/sddm/themes
   ];
+  # Le man page "da programmatore" (sezione 3 e simili) dei pacchetti di
+  # sistema. Le man page dei toolchain arrivano con le devshell.
+  documentation.dev.enable = true;
 
   # ══ Audio (tutta la pila pipewire di Arch → questo blocco) ══════════
   security.rtkit.enable = true;
@@ -233,6 +270,16 @@ in
   hardware.bluetooth.enable = true;
   services.udisks2.enable = true;      # il demone; udiskie (client) è in home/
   zramSwap.enable = true;
+  # RAM finita: earlyoom chiude il processo più grosso prima che tutto si
+  # blocchi, con una notifica (systembus-notify, parte con la sessione).
+  # systemd-oomd è già attivo, ma con i default di NixOS non sorveglia
+  # niente; accenderlo sulle sessioni utente non va bene qui: le app
+  # aperte da mango stanno tutte nello scope della sessione, e oomd
+  # chiuderebbe lo scope intero, cioè mango con tutte le finestre.
+  services.earlyoom = {
+    enable = true;
+    enableNotifications = true;
+  };
   # La GPU (Intel o nvidia) è per-host; questo è il pezzo in comune:
   hardware.graphics.enable = true;
   hardware.graphics.enable32Bit = true;   # steam e i giochi a 32 bit
@@ -240,6 +287,11 @@ in
   # ══ Steam ═══════════════════════════════════════════════════════════
   # (dontkillsteam.sh su Mod+Q lo manda in tray invece di chiuderlo)
   programs.steam.enable = true;
+  # GameMode di Feral: governor della CPU e priorità mentre un gioco gira.
+  # Su Steam, nelle opzioni di avvio: `gamemoderun %command%`. Non è la
+  # modalità gioco di mango (Mod+Alt+G, gaming.conf), che toglie gap,
+  # animazioni e blur: le due cose si sommano.
+  programs.gamemode.enable = true;
 
   # ══ Container e VM ══════════════════════════════════════════════════
   virtualisation.docker = {
@@ -251,9 +303,29 @@ in
     # scavalcano il firewall di NixOS: di default ascoltano solo in locale.
     # Per esporne una alla rete apposta: -p 0.0.0.0:8080:80
     daemon.settings.ip = "127.0.0.1";
+    # Ogni settimana `docker system prune`: container fermi, immagini
+    # senza tag, reti inutilizzate e cache di build (le immagini con un
+    # tag restano). Come nix.gc per lo store. Se dockerd era spento, la
+    # pulizia lo avvia.
+    autoPrune = {
+      enable = true;
+      dates = "weekly";
+    };
   };
-  virtualisation.libvirtd.enable = true;
+  virtualisation.libvirtd = {
+    enable = true;
+    qemu.swtpm.enable = true;   # TPM emulato: serve alle VM Windows 11
+  };
+  # Le chiavette USB dentro le VM di virt-manager (SPICE), senza root.
+  virtualisation.spiceUSBRedirection.enable = true;
   programs.virt-manager.enable = true;   # la GUI; la connessione è in home/
+  # La chiave dei segreti senza TPM (libvirtSecretKey, in cima al file).
+  # Vale solo quando la chiave viene creata: l'unità parte solo se il
+  # file non esiste. Per rigenerare una chiave rimasta legata al TPM:
+  #   sudo mv /var/lib/libvirt/secrets/secrets-encryption-key{,.prev}
+  #   sudo systemctl restart virt-secret-init-encryption libvirtd
+  systemd.services.virt-secret-init-encryption.serviceConfig.ExecStart =
+    [ "" "${libvirtSecretKey}" ];
 
   # ══ VPN ═════════════════════════════════════════════════════════════
   services.mullvad-vpn = {
@@ -266,7 +338,16 @@ in
   services.zerotierone.enable = true;
 
   # ══ Salute del disco e firmware ═════════════════════════════════════
-  services.smartd.enable = true;
+  # Gli avvisi SMART arrivano anche come notifica desktop (swaync), via
+  # systembus-notify: lo stesso canale delle notifiche di earlyoom, che
+  # lo accende. I due moduli devono essere d'accordo, altrimenti la
+  # valutazione fallisce ("conflicting definition values"). Il bus di
+  # sistema accetta notifiche da qualunque utente locale: qui ci sei
+  # solo tu.
+  services.smartd = {
+    enable = true;
+    notifications.systembus-notify.enable = true;
+  };
   # Aggiornamenti firmware da LVFS (BIOS/EC del T470s, SSD, periferiche):
   #   fwupdmgr refresh && fwupdmgr get-updates && fwupdmgr update
   services.fwupd.enable = true;
@@ -301,4 +382,9 @@ in
   # ══ Rimandati di proposito ══════════════════════════════════════════
   # services.flatpak.enable = true;   # su Arch c'era, ma quasi tutto è in nixpkgs
   # (postgresql: NO — vive nelle devshell per-progetto, come deciso!)
+  # services.printing.enable = true;  # stampa; per le stampanti di rete senza
+  #                                   # driver anche services.avahi (nssmdns4)
+  # Backup: ancora niente. services.restic.backups su un disco esterno,
+  # oppure Syncthing tra i due pc passando da ZeroTier.
+  # proton-ge-bin: programs.steam.extraCompatPackages, se un gioco lo chiede.
 }

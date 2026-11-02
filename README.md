@@ -751,7 +751,8 @@ le librerie effettivamente richieste dal progetto. Vedi la
     # desktop (waybar, swaync, rofi, hyprlock validati sul serio), gli script
     # dei bind con comandi finti, game mode, ricerca file, profili idle e
     # conferma del lock, LazyVim/Mason e nixup con comandi simulati, UPower
-    # e font GTK/Qt/fontconfig, fiocco 3D di fastfetch
+    # e font GTK/Qt/fontconfig, fiocco 3D di fastfetch, impostazioni di
+    # sistema (gvfs, man page, soglie di carica, chiave libvirt senza TPM)
     # NB: i flake vedono SOLO i file tracciati da git → `git add` prima
     nix flake check
 

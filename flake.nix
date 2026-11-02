@@ -296,6 +296,56 @@
             touch "$out"
           '';
 
+        # Le impostazioni di sistema della review di novembre 2026: uguali
+        # sui due host, soglie di carica e i915 precoce solo sul portatile.
+        # Più la chiave di libvirt (hosts/common.nix): l'override usa la
+        # chiave dell'host, e l'unità upstream scrive e legge ancora lo
+        # stesso file con lo stesso nome. Se upstream cambia, l'override
+        # va rivisto: meglio scoprirlo qui che con libvirtd fermo.
+        system-baseline =
+          let
+            configs = map (host: self.nixosConfigurations.${host}.config)
+              [ "armoredcoreVIP" "armoredcoreVIF" ];
+            laptop = c: c.networking.hostName == "armoredcoreVIP";
+            names = c: map (p: p.pname or "") c.environment.systemPackages;
+            valid = c:
+              c.services.gvfs.enable
+              && c.documentation.dev.enable
+              && pkgs.lib.elem "man-pages" (names c)
+              && pkgs.lib.elem "man-pages-posix" (names c)
+              && !c.boot.loader.systemd-boot.editor
+              && !c.nix.channel.enable
+              && c.virtualisation.docker.autoPrune.enable
+              && c.services.earlyoom.enable
+              # earlyoom e smartd lo accendono entrambi: se uno dei due
+              # cambia idea, qui la valutazione fallisce subito.
+              && c.services.systembus-notify.enable
+              && c.programs.gamemode.enable
+              && c.virtualisation.libvirtd.qemu.swtpm.enable
+              && c.virtualisation.spiceUSBRedirection.enable
+              && (c.systemd.services ? battery-charge-threshold) == laptop c
+              && pkgs.lib.elem "i915" c.boot.initrd.kernelModules == laptop c
+              && c.home-manager.users.dokkan.home.sessionVariables.SSH_AUTH_SOCK
+                == "$XDG_RUNTIME_DIR/gcr/ssh";
+            keyScript = c: builtins.elemAt
+              c.systemd.services.virt-secret-init-encryption.serviceConfig.ExecStart 1;
+            libvirt = (builtins.head configs).virtualisation.libvirtd.package;
+            units = "${libvirt}/lib/systemd/system";
+            key = "/var/lib/libvirt/secrets/secrets-encryption-key";
+          in
+          assert pkgs.lib.all valid configs;
+          pkgs.runCommand "system-baseline-checked" { } ''
+            ${pkgs.lib.concatMapStrings (c: ''
+              grep -q -- '--with-key=host' ${keyScript c}
+              grep -q -- '--name=secrets-encryption-key - ${key}' ${keyScript c}
+            '') configs}
+            grep -q 'ConditionPathExists=!${key}' ${units}/virt-secret-init-encryption.service
+            grep -q -- '--name=secrets-encryption-key - ${key}' ${units}/virt-secret-init-encryption.service
+            grep -q 'LoadCredentialEncrypted=secrets-encryption-key:${key}' ${units}/libvirtd.service.d/10-secret.conf
+            grep -q 'LoadCredentialEncrypted=secrets-encryption-key:${key}' ${units}/virtsecretd.service
+            touch "$out"
+          '';
+
         # Verifica i font realmente risolti e i file generati, senza attivare
         # la home o dipendere dai font della macchina che esegue il check.
         desktop-settings =
