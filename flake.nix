@@ -262,6 +262,15 @@
             touch "$out"
           '';
         nixup = import ./tests/nixup.nix { inherit pkgs; };
+        # Menu, associazione ROM, CUE e salvataggi, senza giochi né GUI reali.
+        retro-suite = pkgs.runCommand "retro-suite-checked" {
+          nativeBuildInputs = [ pkgs.python3 ];
+        } ''
+          export PYTHONDONTWRITEBYTECODE=1
+          python ${./tests/retro-suite.py} ${./home/retro-suite.py}
+          touch "$out"
+        '';
+        retro-suite-package = self.packages.${system}.retro-suite;
         # Costruisce il wrapper vero: writeShellApplication esegue ShellCheck.
         # Il comando non viene avviato, quindi nessun update/switch nei test.
         nixup-package = import ./home/nixup.nix {
@@ -329,10 +338,16 @@
       # ── Anteprima del desktop in una VM: `nix build .#desktop-preview` ──
       # mango vero con le config del portatile; screenshot in result/.
       # Non è un check: ci mette minuti e nixup lancia i check a ogni update.
-      packages.${system}.desktop-preview = import ./tests/desktop-preview.nix {
-        inherit pkgs;
-        home = self.nixosConfigurations.armoredcoreVIP.config.home-manager.users.dokkan;
-        wallpaper = ./dotfiles/sddm/bg.png;
+      packages.${system} = {
+        desktop-preview = import ./tests/desktop-preview.nix {
+          inherit pkgs;
+          home = self.nixosConfigurations.armoredcoreVIP.config.home-manager.users.dokkan;
+          wallpaper = ./dotfiles/sddm/bg.png;
+        };
+        # Usa la stessa policy allowUnfree del sistema (il core Snes9x).
+        retro-suite = import ./home/retro-suite-package.nix {
+          pkgs = self.nixosConfigurations.armoredcoreVIP.pkgs;
+        };
       };
 
       # ── Devshell "scratch": `nix develop ~/nixos-config#<nome>` da ovunque ──

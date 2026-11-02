@@ -16,6 +16,7 @@ no guilt, just restart.
     home/                      ← la home di dokkan, identica su entrambi
       default.nix              ← entry home-manager
       desktop.nix              ← app, kitty, GTK/Qt, cartelle XDG e app di default
+      retro-suite{,-package}.nix + .py ← menu dei tre classici e RetroArch con core dedicati
       palette.nix              ← Tokyo Night Storm: l'unica fonte dei colori del desktop
       mango.nix                ← sessione mango, ~/.config/mango, script nel PATH, sfondo al login
       mango-configs.nix        ← theme.conf e host.conf generati, `mango -p` a build-time
@@ -562,6 +563,60 @@ Story: circa 600 MB).
 sistema. Dice ai moduli con dati su disco (database, formati di file)
 "sono nato con la 26.05, non migrarmi a sorpresa". Si scrive una volta
 e non si tocca più, anche dopo dieci `flake update`.
+
+## Retro Suite: tre classici dal launcher
+
+`home/retro-suite.nix` installa **Retro Suite**, un piccolo menu Rofi con:
+
+| Gioco | Core RetroArch | File da scegliere |
+|-------|----------------|-------------------|
+| Metroid: Zero Mission | mGBA | `.gba` |
+| Castlevania: Symphony of the Night | Beetle PSX | `.chd` oppure `.cue` con tutti i suoi BIN |
+| Super Metroid | Snes9x | `.sfc` oppure `.smc` |
+
+Dopo `nixup apply`, cerca **Retro Suite** nel launcher (`Mod+Space`),
+oppure esegui `retro-suite`. Al primo avvio di un gioco scegli il tuo
+file; il menu **Associa o cambia un gioco** permette di sostituirlo.
+La suite salva soltanto il percorso: non copia, scarica o include ROM
+nel repository. I BIN restano accanto al loro CUE, con i nomi originali.
+
+I tre core sono fissati dal nixpkgs del sistema e hanno gli stessi comandi
+iniziali: **F1** apre il menu RetroArch, **F2** salva uno stato, **F4** lo
+carica, **Esc** chiude. I salvataggi normali effettuati dentro il gioco
+restano disponibili; gli stati non vengono caricati automaticamente.
+RetroArch include i profili per i controller riconosciuti. Impostazioni e
+rimappature si possono modificare nel suo menu.
+
+Il core PlayStation di questo lock include **OpenBIOS**, quindi il launcher
+non impone un BIOS esterno. Il menu permette anche di importare un BIOS
+originale SCPH-5500/5501/5502: ne verifica l'hash, copia soltanto i file
+riconosciuti e assegna il nome previsto dal core. Non modifica l'originale.
+Vedi la [documentazione Beetle PSX](https://docs.libretro.com/library/beetle_psx/).
+La compatibilità del singolo dump va verificata avviando il gioco.
+
+Con le cartelle XDG predefinite:
+
+- `~/.config/retro-suite/library.json`: associazioni ai file dei giochi;
+- `~/.config/retro-suite/<gioco>.cfg`: impostazioni RetroArch, separate per gioco;
+- `~/.local/share/retro-suite/`: BIOS, salvataggi, stati e screenshot;
+- `~/.local/state/retro-suite/`: log dell'ultimo avvio e lock per evitare due
+  istanze dello stesso gioco contemporaneamente.
+
+Il menu **Apri salvataggi e BIOS** apre la cartella da includere nei backup.
+Evita di rinominare una ROM dopo aver iniziato: il nome dei salvataggi
+dipende anche dal nome del file. Cambiare dump può richiedere di trasferire
+manualmente i salvataggi compatibili. Le impostazioni della suite sono
+scrivibili, separate da quelle di un eventuale RetroArch già in uso.
+
+Per avviare direttamente uno dei tre titoli:
+
+    retro-suite --game zero-mission
+    retro-suite --game symphony
+    retro-suite --game super-metroid
+
+Per costruire soltanto la suite: `nix build .#retro-suite`.
+I test del flake coprono associazione/cancellazione, percorsi, CUE,
+importazione BIOS e protezione dei salvataggi senza richiedere ROM.
 
 ## SSH: come funziona qui
 

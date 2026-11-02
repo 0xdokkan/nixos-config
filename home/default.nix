@@ -6,6 +6,7 @@
     ./mango.nix     # il compositor: config validata, sessione systemd
     ./waybar.nix    # la barra
     ./rofi.nix      # launcher e menu (wifi, bluetooth, Wi-Fi QR)
+    ./retro-suite.nix # libreria per Metroid e Castlevania
     ./notifications.nix # swaync (notifiche, centro di controllo) e swayosd
     ./lock.nix      # hyprlock e idle AC/batteria
     ./session.nix   # polkit, appunti, sfondo, luce notturna, dischi, batteria
